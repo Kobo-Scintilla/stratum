@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  // SvelteKit plugin auto-detects routes, layouts, hooks.
+  // No manual entry points needed.
+  "entry": [],
+  // Suppress unused-re-export noise from shadcn barrel files.
+  // These export many short names that get used as the app grows.
+  "ignoreExports": [
+    {
+      "file": "src/lib/components/ui/sidebar/index.ts",
+      "exports": ["*"]
+    }
+  ],
+  "duplicates": {
+    "minOccurrences": 3,
+    "ignoreDefaults": true
+  },
+  "rules": {},
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15
+  },
+  "audit": {
+    "gate": "new-only"
+  }
+}
