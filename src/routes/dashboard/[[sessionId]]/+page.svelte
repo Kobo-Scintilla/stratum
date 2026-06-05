@@ -20,7 +20,7 @@
 		const map = new Map<string, { result: string; isError: boolean }>();
 		for (const m of chat.messages) {
 			if (m.role === 'tool' && m.toolCallId) {
-				map.set(m.toolCallId, { result: m.toolResult ?? '', isError: m.isError ?? false });
+				map.set(m.toolCallId, { result: String(m.toolResult ?? ''), isError: m.isError ?? false });
 			}
 		}
 		return map;
@@ -98,9 +98,5 @@
 		</div>
 	</ScrollArea.Root>
 
-	<ChatInput
-		disabled={chat.isSending}
-		error={chat.error}
-		onsend={handleSend}
-	/>
+	<ChatInput disabled={chat.isSending} error={chat.error} onsend={handleSend} />
 </div>

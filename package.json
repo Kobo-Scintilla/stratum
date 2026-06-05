@@ -14,7 +14,7 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
-		"@flue/runtime": "^0.9.1",
+		"@flue/runtime": "^0.9.2",
 		"@hugeicons/core-free-icons": "^4.2.0",
 		"@hugeicons/svelte": "^1.1.2",
 		"better-sqlite3": "^12.10.0",
