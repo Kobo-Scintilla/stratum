@@ -1,3 +1,4 @@
+// TODO(eval-seed): benchmark fixture — safe to ignore
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 

@@ -1,0 +1,26 @@
+{
+  "baseURL": "http://172.18.0.2:8080/v1",
+  "model": "b-opencodezen/deepseek-v4-flash-free",
+  "startedAt": "2026-06-05T10:36:34.381Z",
+  "results": [
+    {
+      "taskId": "package-name",
+      "mode": "node-tools",
+      "totalIn": 2130,
+      "totalOut": 88,
+      "totalReason": 36,
+      "turns": 2,
+      "toolCalls": 1,
+      "toolLog": [
+        {
+          "name": "read_file",
+          "argsPreview": "{\"path\":\"/root/dev/app/package.json\"}"
+        }
+      ],
+      "wallMs": 2700,
+      "finalAnswer": "app",
+      "success": true,
+      "gtReason": "exact match"
+    }
+  ]
+}

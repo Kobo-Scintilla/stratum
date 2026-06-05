@@ -1,0 +1,30 @@
+{
+  "baseURL": "http://172.18.0.2:8080/v1",
+  "model": "b-opencodezen/deepseek-v4-flash-free",
+  "startedAt": "2026-06-05T10:27:44.479Z",
+  "results": [
+    {
+      "taskId": "small-lookup",
+      "mode": "with-tools",
+      "totalIn": 3937,
+      "totalOut": 201,
+      "totalReason": 87,
+      "turns": 3,
+      "toolCalls": 2,
+      "toolLog": [
+        {
+          "name": "execute",
+          "argsPreview": "{\"language\":\"bash\"}"
+        },
+        {
+          "name": "execute",
+          "argsPreview": "{\"code\":\"wc -l < /root/dev/app/package.json\",\"language\":\"shell\"}"
+        }
+      ],
+      "wallMs": 5299,
+      "finalAnswer": "49",
+      "success": false,
+      "gtReason": "got 49, expected 50"
+    }
+  ]
+}

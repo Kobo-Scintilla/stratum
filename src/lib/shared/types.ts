@@ -1,5 +1,6 @@
 import type { ActiveStream } from './entities/ActiveStream';
 import type { ChatMessage } from './entities/ChatMessage';
+import type { HandoffArtifact } from '../server/tools/handoff';
 
 // ── Agent Event Types ──────────────────────────────────────────
 
@@ -22,7 +23,8 @@ export type AgentEvent =
 	  }
 	| { type: 'turn_request'; model: string; provider: string; input: { messages: unknown[]; tools?: unknown[] } }
 	| { type: 'turn_end'; message: unknown; toolResults: unknown[] }
-	| { type: 'error'; error: unknown };
+	| { type: 'error'; error: unknown }
+	| { type: 'handoff'; artifact: HandoffArtifact };
 
 // ── Global bridge types (used via app.d.ts) ────────────────────
 

@@ -1,3 +1,4 @@
+// TODO(eval-seed): benchmark fixture — safe to ignore
 import { BackendMethod, remult } from 'remult';
 import { ActiveStream } from './entities/ActiveStream';
 import { ChatMessage } from './entities/ChatMessage';

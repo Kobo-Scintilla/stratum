@@ -3,6 +3,16 @@ import { createFlueContext, resolveModel, invokeWorkflowAttached } from '@flue/r
 import { FlueSessionStore } from '../shared/FlueSessionStore';
 import { local } from '@flue/runtime/node';
 import type { AgentEvent } from '../shared/types';
+import { buildHandoffArtifact, formatHandoffForPrompt, shouldHandoff } from './tools/handoff';
+
+// Per-session tracking for the system-triggered handoff at context window edge.
+// turnCount and the most recent user messages let us estimate context fill and
+// derive an objective when the model's window is near its limit.
+const sessionHandoffState = new Map<
+	string,
+	{ turnCount: number; recentUserMessages: string[]; totalChars: number }
+>();
+const HANDOFF_MESSAGE_WINDOW = 5;
 
 class AsyncQueue<T> {
 	private queue: T[] = [];
@@ -168,13 +178,52 @@ export const flue = {
 								input: event.input!
 							});
 							break;
-						case 'turn_end':
-							queue.push({
-								type: 'turn_end',
-								message: event.message,
-								toolResults: event.toolResults ?? []
-							});
+						case 'turn_end': {
+							const userMessage =
+								typeof prompt === 'string' ? prompt : JSON.stringify(prompt);
+							const state =
+								sessionHandoffState.get(sessionId) ??
+								{ turnCount: 0, recentUserMessages: [], totalChars: 0 };
+							state.turnCount += 1;
+							state.recentUserMessages.push(userMessage);
+							if (state.recentUserMessages.length > HANDOFF_MESSAGE_WINDOW) {
+								state.recentUserMessages.shift();
+							}
+							state.totalChars += userMessage.length;
+							sessionHandoffState.set(sessionId, state);
+
+							// Heuristic: 20 turns ≈ full context, with a bump for accumulated
+							// message size (≈4 chars/token against an 80k-token budget).
+							// We don't track pendingCompaction here, so pass false — that
+							// shifts the threshold to 95% (see shouldHandoff).
+							const charBasedRatio = state.totalChars / 320000;
+							const contextFillRatio = Math.min(
+								0.95,
+								state.turnCount * 0.05 + charBasedRatio
+							);
+
+							if (shouldHandoff(contextFillRatio, false)) {
+								const lastUserMessage =
+									state.recentUserMessages[state.recentUserMessages.length - 1] ??
+									userMessage;
+								const artifact = buildHandoffArtifact({
+									objective: lastUserMessage,
+									priorDecisions: [],
+									currentState: `session ${sessionId} after ${state.turnCount} turns`,
+									nextSteps: []
+								});
+								console.log('[Handoff]', formatHandoffForPrompt(artifact));
+								queue.push({ type: 'handoff', artifact });
+								sessionHandoffState.delete(sessionId);
+							} else {
+								queue.push({
+									type: 'turn_end',
+									message: event.message,
+									toolResults: event.toolResults ?? []
+								});
+							}
 							break;
+						}
 						case 'error':
 							queue.push({ type: 'error', error: event.error });
 							break;
