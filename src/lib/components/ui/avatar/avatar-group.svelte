@@ -12,8 +12,11 @@
 
 <div
 	bind:this={ref}
-	data-slot="sheet-header"
-	class={cn("gap-1.5 p-4 flex flex-col", className)}
+	data-slot="avatar-group"
+	class={cn(
+		"cn-avatar-group *:data-[slot=avatar]:ring-background group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2",
+		className
+	)}
 	{...restProps}
 >
 	{@render children?.()}

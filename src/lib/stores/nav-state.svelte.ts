@@ -1,30 +1,30 @@
-import { persistedState } from "svelte-persisted-state";
-import { getContext, setContext } from "svelte";
-import { browser } from "$app/environment";
-import type { Component } from "svelte";
+import { persistedState } from 'svelte-persisted-state';
+import { getContext, setContext } from 'svelte';
+import { browser } from '$app/environment';
 
 /* ─── Types ─── */
 
-export type TabId = "sessions";
+export type TabId = 'sessions';
 
 export type NavItem = {
 	id: TabId;
 	title: string;
-	icon: Component;
+	icon: IconSvgElement;
 };
 
 /* ─── Nav items ─── */
 
-import MessagesSquare from "@lucide/svelte/icons/messages-square";
+import { Message01FreeIcons } from '@hugeicons/core-free-icons';
+import type { IconSvgElement } from '@hugeicons/svelte';
 
 export const navItems: NavItem[] = [
-	{ id: "sessions", title: "Sessions", icon: MessagesSquare },
+	{ id: 'sessions', title: 'Sessions', icon: Message01FreeIcons }
 ];
 
 /* ─── Per-request nav state via context ─── */
 
-const KEY = "nav-active-tab";
-const CONTEXT_KEY = Symbol("nav-state");
+const KEY = 'nav-active-tab';
+const CONTEXT_KEY = Symbol('nav-state');
 
 function writeCookie(value: unknown) {
 	if (!browser) return;
@@ -37,8 +37,8 @@ function writeCookie(value: unknown) {
  */
 export function createNavState(ssrValue: string | null) {
 	const state = persistedState<TabId | null>(KEY, ssrValue as TabId | null, {
-		storage: "local",
-		syncTabs: true,
+		storage: 'local',
+		syncTabs: true
 	});
 
 	const nav = {
@@ -55,7 +55,7 @@ export function createNavState(ssrValue: string | null) {
 		reset() {
 			state.reset();
 			writeCookie(null);
-		},
+		}
 	};
 
 	setContext(CONTEXT_KEY, nav);

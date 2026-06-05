@@ -8,6 +8,9 @@ export class ActiveStream {
 	id!: string;
 
 	@Fields.string()
+	sessionId = 'default';
+
+	@Fields.string()
 	prompt = '';
 
 	@Fields.string()
@@ -21,4 +24,10 @@ export class ActiveStream {
 
 	@Fields.json()
 	toolCalls: Array<{ id: string; name: string; args: unknown; result?: unknown; isError?: boolean }> = [];
+
+	@Fields.json()
+	segments: Array<
+		| { type: 'text'; text: string }
+		| { type: 'tool'; toolCallId: string; toolName: string; args: unknown; result?: unknown; isError?: boolean }
+	> = [];
 }

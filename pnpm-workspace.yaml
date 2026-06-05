@@ -1,11 +1,7 @@
 allowBuilds:
   '@google/genai': true
+  '@hugeicons/svelte': false
   '@mongodb-js/zstd': true
-  '@tailwindcss/oxide': true
   better-sqlite3: true
-  esbuild: true
   node-liblzma: true
   protobufjs: true
-  sharp: true
-  workerd: true
-onlyBuiltDependencies: '@google/genai @mongodb-js/zstd node-liblzma protobufjs sharp workerd'
