@@ -1,10 +1,7 @@
 import { BackendMethod, remult } from 'remult';
 import { ActiveStream } from '../entities/active-stream';
 import { ChatMessage } from '../entities/chat-message';
-import { runAgentLoop } from '@earendil-works/pi-agent-core';
-import { getModel } from '@earendil-works/pi-ai';
-import type { AgentEvent } from '../types';
-const FLUSH_INTERVAL_MS = 1;
+import { getModel, streamSimple } from '@earendil-works/pi-ai';
 
 function genId(): string {
 	return crypto.randomUUID();
@@ -88,257 +85,143 @@ async function insertToolResultMessage(
 	});
 }
 
-function translateEvent(event: Record<string, unknown>): AgentEvent | null {
-	switch (event.type) {
-		case 'message_update': {
-			const msgEvent = event.assistantMessageEvent as Record<string, unknown> | undefined;
-			console.log('[debug] message_update received, msgEvent type:', msgEvent?.type, 'has delta:', typeof msgEvent?.delta === 'string');
-			if (msgEvent?.type === 'text_delta' && typeof msgEvent.delta === 'string') {
-				console.log('[debug] text_delta extracted, length:', msgEvent.delta.length, 'text:', JSON.stringify(msgEvent.delta));
-				return { type: 'text_delta', text: msgEvent.delta };
-			}
-			console.log('[debug] message_update NOT text_delta, event type:', event.type, 'msgEvent type:', msgEvent?.type, 'raw event keys:', Object.keys(event));
-			return null;
-		}
-		case 'tool_start':
-		case 'tool_call':
-		case 'tool_execution_start':
-			return {
-				type: event.type as 'tool_start' | 'tool_call' | 'tool_execution_start',
-				toolCallId: event.toolCallId as string,
-				toolName: event.toolName as string,
-				args: event.args
-			};
-		case 'tool_execution_end':
-			return {
-				type: 'tool_execution_end',
-				toolCallId: event.toolCallId as string,
-				toolName: event.toolName as string,
-				result: event.result,
-				isError: (event.isError as boolean) ?? false
-			};
-		case 'turn_end':
-			return {
-				type: 'turn_end',
-				message: event.message,
-				toolResults: (event.toolResults as unknown[]) ?? []
-			};
-		default:
-			return null;
-	}
-}
-
 export class AgentService {
 	@BackendMethod({ allowed: true })
 	static async ask(prompt: string, sessionId: string = 'default'): Promise<string> {
 		await insertUserMessage(sessionId, prompt);
-		const stream = await insertActiveStream(sessionId, prompt);
+		const activeStream = await insertActiveStream(sessionId, prompt);
 
 		const model = getModel('opencode-go', 'deepseek-v4-flash');
 
-		let accumulatedText = '';
-		let lastWasTool = false;
-		let toolCalls: Array<{
-			id: string;
-			name: string;
-			args: unknown;
-			result?: unknown;
-			isError?: boolean;
-		}> = [];
-		let segments: ActiveStream['segments'] = [];
-
-		// ── Load previous conversation from DB for session memory ──
+		// ── Load conversation history ──
 		const prevMessages = await remult.repo(ChatMessage).find({
 			where: { sessionId },
 			orderBy: { sortOrder: 'asc' }
 		});
-		const historyMsgs = prevMessages
+		const llmMessages = prevMessages
 			.filter((m) => m.role === 'user' || m.role === 'assistant')
 			.map((m) => {
 				const ts = m.createdAt.getTime();
 				if (m.role === 'user') {
-					// User messages pass through with string content
 					return { role: 'user' as const, content: m.content, timestamp: ts };
 				}
-				// Assistant messages need content as content-block array for pi-ai's transformMessages
 				return { role: 'assistant' as const, content: [{ type: 'text' as const, text: m.content }], timestamp: ts };
-			}) as import('@earendil-works/pi-agent-core').AgentMessage[];
+			}) as import('@earendil-works/pi-ai').Message[];
+		llmMessages.push({ role: 'user', content: prompt, timestamp: Date.now() });
+
+		let accumulatedText = '';
+		let turnAccumulatedText = '';
+		let lastWasTool = false;
+		let toolCalls: Array<{
+			id: string; name: string; args: unknown; result?: unknown; isError?: boolean;
+		}> = [];
+		let turnToolCalls: typeof toolCalls = [];
+		let segments: ActiveStream['segments'] = [];
 
 		try {
-			let lastFlushTime = Date.now();
-			let turnAccumulatedText = '';
-			let turnToolCalls: typeof toolCalls = [];
+			const eventStream = streamSimple(model, {
+				systemPrompt: '',
+				messages: llmMessages
+			});
 
-			const userMessage = { role: 'user' as const, content: prompt, timestamp: Date.now() };
-			console.log(
-				'[ask] starting runAgentLoop, model:',
-				model.id,
-				model.provider,
-				model.api,
-				'hasOpenCodeKey:',
-				!!process.env.OPENCODE_API_KEY
-			);
-			await runAgentLoop(
-				[userMessage],
-				{
-					systemPrompt: '',
-					messages: historyMsgs,
-					tools: []
-				},
-				{
-					model,
-					convertToLlm: (msgs) =>
-						msgs.filter(
-							(m): m is import('@earendil-works/pi-ai').Message =>
-								m.role === 'user' || m.role === 'assistant' || m.role === 'toolResult'
-						)
-				},
-				async (raw: unknown) => {
-					const evt = raw as Record<string, unknown>;
-					// Debug: log every event type
-					if (evt.type === 'message_start' || evt.type === 'message_end') {
-						const msg = evt.message as Record<string, unknown> | undefined;
-						console.log('[ask event]', evt.type, 'content:', Array.isArray(msg?.content) ? (msg?.content as unknown[]).length : 'N/A', 'stopReason:', msg?.stopReason);
-					} else if (evt.type === 'message_update') {
-						console.log('[ask event] message_update');
-					} else {
-						console.log('[ask event]', evt.type);
+			for await (const event of eventStream) {
+				switch (event.type) {
+					case 'text_delta': {
+						const t = event.delta;
+						if (!t) break;
+						accumulatedText += t;
+						turnAccumulatedText += t;
+						if (lastWasTool || segments.length === 0) {
+							segments.push({ type: 'text', text: t });
+							lastWasTool = false;
+						} else {
+							const last = segments[segments.length - 1];
+							if (last.type === 'text') last.text += t;
+						}
+						await updateActiveStream(activeStream, accumulatedText, toolCalls, segments);
+						break;
 					}
-					if (evt.type === 'error') {
-						console.log('[ask] STREAM ERROR:', evt.error);
+
+					case 'toolcall_start': {
+						const idx = (event as { contentIndex: number }).contentIndex;
+						const block = (event as Record<string, unknown>).partial as {
+							content: Array<{ type: string; id?: string; name?: string }>;
+						};
+						const tcBlock = block?.content?.[idx];
+						const tcId = tcBlock?.id ?? 'unknown';
+						const tcName = tcBlock?.name ?? 'unknown';
+						if (!toolCalls.find((t) => t.id === tcId)) {
+							toolCalls.push({ id: tcId, name: tcName, args: {}, result: undefined, isError: false });
+							turnToolCalls.push({ id: tcId, name: tcName, args: {} });
+							segments.push({
+								type: 'tool', toolCallId: tcId, toolName: tcName, args: {}, result: undefined, isError: false
+							});
+							lastWasTool = true;
+							await updateActiveStream(activeStream, accumulatedText, toolCalls, segments);
+						}
+						break;
 					}
-					const event = translateEvent(evt);
-					if (!event) return;
-					switch (event.type) {
-						case 'text_delta': {
-							const t = event.text as string;
-							if (!t) break;
-							console.log('[debug text_delta] delta:', JSON.stringify(t), 'acc len:', accumulatedText.length + t.length);
-							accumulatedText += t;
-							turnAccumulatedText += t;
-							if (lastWasTool || segments.length === 0) {
-								segments.push({ type: 'text', text: t });
-								lastWasTool = false;
-							} else {
-								const last = segments[segments.length - 1];
-								if (last.type === 'text') last.text += t;
-							}
-							if (Date.now() - lastFlushTime > FLUSH_INTERVAL_MS) {
-								console.log('[debug flush] saving stream, seg count:', segments.length, 'text len:', accumulatedText.length);
-								await updateActiveStream(stream, accumulatedText, toolCalls, segments);
-								lastFlushTime = Date.now();
-							}
-							break;
+					case 'toolcall_end': {
+						const tc = event.toolCall as {
+							id: string; name: string; arguments: Record<string, unknown>;
+						};
+						const existing = toolCalls.find((t) => t.id === tc.id);
+						if (existing) {
+							existing.args = tc.arguments;
+						} else {
+							toolCalls.push({
+								id: tc.id, name: tc.name, args: tc.arguments, result: undefined, isError: false
+							});
+							segments.push({
+								type: 'tool', toolCallId: tc.id, toolName: tc.name,
+								args: tc.arguments, result: undefined, isError: false
+							});
 						}
-						case 'tool_start':
-						case 'tool_call':
-						case 'tool_execution_start': {
-							const tc = event as { toolCallId: string; toolName: string; args: unknown };
-							if (!toolCalls.find((t) => t.id === tc.toolCallId)) {
-								toolCalls.push({ id: tc.toolCallId, name: tc.toolName, args: tc.args });
-								turnToolCalls.push({ id: tc.toolCallId, name: tc.toolName, args: tc.args });
-								segments.push({
-									type: 'tool',
-									toolCallId: tc.toolCallId,
-									toolName: tc.toolName,
-									args: tc.args,
-									result: undefined,
-									isError: false
-								});
-								lastWasTool = true;
-								await updateActiveStream(stream, accumulatedText, toolCalls, segments);
-							}
-							break;
+						const seg = segments.find((s) => s.type === 'tool' && s.toolCallId === tc.id);
+						if (seg && seg.type === 'tool') {
+							seg.args = tc.arguments;
 						}
-						case 'tool_execution_end': {
-							const tc = event as {
-								toolCallId: string;
-								toolName: string;
-								result: unknown;
-								isError: boolean;
-							};
-							const existing = toolCalls.find((t) => t.id === tc.toolCallId);
-							if (existing) {
-								existing.result = tc.result;
-								existing.isError = tc.isError;
-							} else {
-								toolCalls.push({
-									id: tc.toolCallId,
-									name: tc.toolName,
-									args: undefined,
-									result: tc.result,
-									isError: tc.isError
-								});
-								segments.push({
-									type: 'tool',
-									toolCallId: tc.toolCallId,
-									toolName: tc.toolName,
-									args: undefined,
-									result: tc.result as Record<string, unknown>,
-									isError: tc.isError
-								});
-							}
-							const seg = segments.find((s) => s.type === 'tool' && s.toolCallId === tc.toolCallId);
-							if (seg && seg.type === 'tool') {
-								seg.result = tc.result as Record<string, unknown>;
-								seg.isError = tc.isError;
-							}
-							await insertToolResultMessage(
-								sessionId,
-								toolCalls.find((t) => t.id === tc.toolCallId) ?? {
-									id: tc.toolCallId,
-									name: tc.toolName,
-									result: tc.result,
-									isError: tc.isError
-								},
-								Date.now()
-							);
-							await updateActiveStream(stream, accumulatedText, toolCalls, segments);
-							break;
-						}
-						case 'turn_end': {
-							console.log('[debug turn_end] turnAccumulatedText len:', turnAccumulatedText.length, 'text:', JSON.stringify(turnAccumulatedText.slice(0, 100)));
-							await insertAssistantMessage(
-								sessionId,
-								turnAccumulatedText,
-								turnToolCalls,
-								Date.now()
-							);
+						await updateActiveStream(activeStream, accumulatedText, toolCalls, segments);
+						break;
+					}
+
+					case 'done': {
+						if (turnAccumulatedText || turnToolCalls.length > 0) {
+							await insertAssistantMessage(sessionId, turnAccumulatedText, turnToolCalls, Date.now());
 							turnAccumulatedText = '';
 							turnToolCalls = [];
-							accumulatedText = '';
-							toolCalls = [];
-							segments = [];
-							console.log('[debug turn_end] clearing stream text/segments');
-							await updateActiveStream(stream, '', [], []);
-							break;
 						}
-						case 'error': {
-							console.error('[ask] Agent event error:', event.error);
-							break;
-						}
+						accumulatedText = '';
+						toolCalls = [];
+						segments = [];
+						await updateActiveStream(activeStream, '', [], []);
+						break;
+					}
+
+					case 'error': {
+						console.error('[ask] stream error:', event.error);
+						break;
 					}
 				}
-			);
+			}
 
-			console.log('[ask] agent loop completed');
-			await insertAssistantMessage(sessionId, turnAccumulatedText, turnToolCalls, Date.now());
+			// After stream completes, ensure any remaining turn is saved
+			if (turnAccumulatedText || turnToolCalls.length > 0) {
+				await insertAssistantMessage(sessionId, turnAccumulatedText, turnToolCalls, Date.now());
+			}
 		} catch (err) {
 			console.error('[ask] Agent stream error:', err);
 		} finally {
-			console.log('[ask] cleanup');
 			// Delay deletion so frontend liveQuery receives ChatMessage before stream disappears
-			const sid = stream.id;
+			const sid = activeStream.id;
 			setTimeout(() => {
 				globalThis.remultApi?.withRemult(undefined, async () => {
 					await remult.repo(ActiveStream).delete(sid);
-				}).catch(() => {
-					// ignore if already gone
-				});
+				}).catch(() => {});
 			}, 800);
 		}
 
-		return stream.id;
+		return activeStream.id;
 	}
 
 	@BackendMethod({ allowed: true })
