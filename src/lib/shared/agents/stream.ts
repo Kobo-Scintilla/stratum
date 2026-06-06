@@ -3,6 +3,7 @@ import { getModel, streamSimple } from '@earendil-works/pi-ai';
 import { ActiveStream } from '../entities/active-stream';
 import { ChatMessage } from '../entities/chat-message';
 import type { Context, AgentConfig, TrackedToolCall } from './types';
+import type { Message } from '@earendil-works/pi-ai';
 import { toolRegistry } from './tools';
 import { persistToolResult } from './context';
 
@@ -89,12 +90,10 @@ export async function insertUserMessage(
 		});
 	});
 }
-
 export async function runStreamLoop(
 	config: AgentConfig,
 	context: Context,
-	sessionId: string,
-	streamId: string
+	sessionId: string
 ): Promise<void> {
 	const model = getModel(config.modelProvider as never, config.modelId as never);
 
@@ -103,92 +102,90 @@ export async function runStreamLoop(
 	let toolCalls: TrackedToolCall[] = [];
 	let segments: ActiveStream['segments'] = [];
 
-	const stream = await withOwnContext(async () => {
-		return await remult.repo(ActiveStream).findId(streamId);
-	});
-	if (!stream) throw new Error(`ActiveStream ${streamId} not found`);
-let _iter = 0;
 	while (true) {
-		_iter++;
-		console.log('[iter]', _iter, 'msgs:', context.messages.length, 'text:', JSON.stringify(accumulatedText).slice(0, 50));
+		// Each iteration gets its own ActiveStream so ChatMessage saves on previous
+		// iteration don't overlap with the next iteration's streaming UI.
+		const stream = await insertActiveStream(sessionId, '');
+		if (!stream) continue;
+
 		const eventStream = streamSimple(model, context);
 
-			for await (const event of eventStream) {
-				switch (event.type) {
-					case 'text_delta': {
-						const t = event.delta;
-						if (!t) break;
-						accumulatedText += t;
-						if (lastWasTool || segments.length === 0) {
-							segments.push({ type: 'text', text: t });
-							lastWasTool = false;
-						} else {
-							const last = segments[segments.length - 1];
-							if (last.type === 'text') last.text += t;
-						}
-						await updateActiveStream(stream, accumulatedText, toolCalls, segments);
-						break;
+		for await (const event of eventStream) {
+			switch (event.type) {
+				case 'text_delta': {
+					const t = event.delta;
+					if (!t) break;
+					accumulatedText += t;
+					if (lastWasTool || segments.length === 0) {
+						segments.push({ type: 'text', text: t });
+						lastWasTool = false;
+					} else {
+						const last = segments[segments.length - 1];
+						if (last.type === 'text') last.text += t;
 					}
+					await updateActiveStream(stream, accumulatedText, toolCalls, segments);
+					break;
+				}
 
-					case 'toolcall_start': {
-						const idx = (event as { contentIndex: number }).contentIndex;
-						const block = (event as Record<string, unknown>).partial as {
-							content: Array<{ type: string; id?: string; name?: string }>;
-						};
-						const tcBlock = block?.content?.[idx];
-						const tcId = tcBlock?.id ?? 'unknown';
-						const tcName = tcBlock?.name ?? 'unknown';
-						if (!toolCalls.find((t) => t.id === tcId)) {
-							toolCalls.push({ id: tcId, name: tcName, args: {}, result: undefined, isError: false });
-							segments.push({
-								type: 'tool',
-								toolCallId: tcId,
-								toolName: tcName,
-								args: {},
-								result: undefined,
-								isError: false
-							});
-							lastWasTool = true;
-							await updateActiveStream(stream, accumulatedText, toolCalls, segments);
-						}
-						break;
-					}
-
-					case 'toolcall_end': {
-						const tc = event.toolCall as {
-							id: string;
-							name: string;
-							arguments: Record<string, unknown>;
-						};
-						const existing = toolCalls.find((t) => t.id === tc.id);
-						if (existing) {
-							existing.args = tc.arguments;
-						} else {
-							toolCalls.push({
-								id: tc.id,
-								name: tc.name,
-								args: tc.arguments,
-								result: undefined,
-								isError: false
-							});
-							segments.push({
-								type: 'tool',
-								toolCallId: tc.id,
-								toolName: tc.name,
-								args: tc.arguments,
-								result: undefined,
-								isError: false
-							});
-						}
-						const seg = segments.find(
-							(s) => s.type === 'tool' && s.toolCallId === tc.id
-						);
-						if (seg && seg.type === 'tool') seg.args = tc.arguments;
+				case 'toolcall_start': {
+					const idx = (event as { contentIndex: number }).contentIndex;
+					const block = (event as Record<string, unknown>).partial as {
+						content: Array<{ type: string; id?: string; name?: string }>;
+					};
+					const tcBlock = block?.content?.[idx];
+					const tcId = tcBlock?.id ?? 'unknown';
+					const tcName = tcBlock?.name ?? 'unknown';
+					if (!toolCalls.find((t) => t.id === tcId)) {
+						toolCalls.push({ id: tcId, name: tcName, args: {}, result: undefined, isError: false });
+						segments.push({
+							type: 'tool',
+							toolCallId: tcId,
+							toolName: tcName,
+							args: {},
+							result: undefined,
+							isError: false
+						});
+						lastWasTool = true;
 						await updateActiveStream(stream, accumulatedText, toolCalls, segments);
-						break;
 					}
+					break;
+				}
+
+				case 'toolcall_end': {
+					const tc = event.toolCall as {
+						id: string;
+						name: string;
+						arguments: Record<string, unknown>;
+					};
+					const existing = toolCalls.find((t) => t.id === tc.id);
+					if (existing) {
+						existing.args = tc.arguments;
+					} else {
+						toolCalls.push({
+							id: tc.id,
+							name: tc.name,
+							args: tc.arguments,
+							result: undefined,
+							isError: false
+						});
+						segments.push({
+							type: 'tool',
+							toolCallId: tc.id,
+							toolName: tc.name,
+							args: tc.arguments,
+							result: undefined,
+							isError: false
+						});
+					}
+					const seg = segments.find(
+						(s) => s.type === 'tool' && s.toolCallId === tc.id
+					);
+					if (seg && seg.type === 'tool') seg.args = tc.arguments;
+					await updateActiveStream(stream, accumulatedText, toolCalls, segments);
+					break;
+				}
+
 				case 'done': {
-					console.log('[debug done] iter:', _iter, 'accText:', JSON.stringify(accumulatedText).slice(0, 80), 'toolCalls:', toolCalls.length);
 					// Push assistant message to context so tool results have a preceding assistant with tool_calls
 					const content: ({ type: 'text'; text: string } | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> })[] = [];
 					if (accumulatedText) content.push({ type: 'text', text: accumulatedText });
@@ -204,40 +201,48 @@ let _iter = 0;
 						role: 'assistant',
 						content,
 						timestamp: Date.now()
-					} as any);
+					} as unknown as Message);
 					break;
 				}
 
 				case 'error': {
-						console.error('[stream] stream error:', event.error);
-						break;
-					}
+					console.error('[stream] stream error:', event.error);
+					break;
 				}
 			}
-			// ── After stream ends, check for pending tool calls ──
-			const pendingToolCalls = toolCalls.filter((t) => t.result === undefined);
+		}
 
+		// ── After stream ends, check for pending tool calls ──
+		const pendingToolCalls = toolCalls.filter((t) => t.result === undefined);
 
-			if (pendingToolCalls.length === 0) break;
+		// Save assistant message (with toolCalls) to DB BEFORE executing tools,
+		// so sort order is: assistant[toolCalls] → toolResult → assistant[text]
+		if (accumulatedText || toolCalls.length > 0) {
+			await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+		}
 
-			// Save assistant message (with toolCalls) to DB BEFORE executing tools,
-			// so sort order is: assistant[toolCalls] → toolResult → assistant[text]
-			if (accumulatedText || toolCalls.length > 0) {
-				await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+		// Delete this iteration's stream now that its content is saved as ChatMessage
+		await withOwnContext(async () => {
+			await remult.repo(ActiveStream).delete(stream.id);
+		}).catch(() => {});
+
+		if (pendingToolCalls.length === 0) break;
+
+		// Execute tools and add results to context for next iteration
+		for (const tc of pendingToolCalls) {
+			const { result, isError } = await toolRegistry.execute(
+				tc.name,
+				tc.args as Record<string, unknown>
+			);
+			tc.result = result;
+			tc.isError = isError;
+
+			// Update segment with result
+			const seg = segments.find((s) => s.type === 'tool' && s.toolCallId === tc.id);
+			if (seg && seg.type === 'tool') {
+				seg.result = result;
+				seg.isError = isError;
 			}
-
-			// Execute tools and add results to context for next iteration
-			for (const tc of pendingToolCalls) {
-				const { result, isError } = await toolRegistry.execute(
-					tc.name,
-					tc.args as Record<string, unknown>
-				);
-				tc.result = result;
-				tc.isError = isError;
-
-				// Update segment with result
-				const seg = segments.find((s) => s.type === 'tool' && s.toolCallId === tc.id);
-			await updateActiveStream(stream, accumulatedText, toolCalls, segments);
 
 			// Add tool result to the LLM context for continuation
 			context.messages.push({
@@ -247,20 +252,15 @@ let _iter = 0;
 				content: [{ type: 'text' as const, text: result }],
 				isError,
 				timestamp: Date.now()
-			});
+			} as unknown as Message);
 
 			// Persist tool result message
 			await persistToolResult(sessionId, tc, Date.now());
 		}
 
-			// Reset accumulators for next turn
-			accumulatedText = '';
-			toolCalls = [];
-			segments = [];
-		}
-
-		// Final turn: save if there was accumulated text (text-only response, no tool calls)
-		if (accumulatedText || toolCalls.length > 0) {
-			await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
-		}
+		// Reset accumulators for next turn
+		accumulatedText = '';
+		toolCalls = [];
+		segments = [];
 	}
+}
