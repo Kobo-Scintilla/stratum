@@ -228,6 +228,12 @@ export async function runStreamLoop(
 
 			if (pendingToolCalls.length === 0) break;
 
+			// Save assistant message (with toolCalls) to DB BEFORE executing tools,
+			// so sort order is: assistant[toolCalls] → toolResult → assistant[text]
+			if (accumulatedText || toolCalls.length > 0) {
+				await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+			}
+
 			// Execute tools and add results to context for next iteration
 			for (const tc of pendingToolCalls) {
 				const { result, isError } = await toolRegistry.execute(
@@ -257,12 +263,6 @@ export async function runStreamLoop(
 
 				// Persist tool result message
 				await persistToolResult(sessionId, tc, Date.now());
-			}
-
-			// Save this turn's assistant message to DB now that streaming is done for this iteration
-			// (done handler only pushes to context.messages; DB save would trigger liveQuery overlap)
-			if (accumulatedText || toolCalls.length > 0) {
-				await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
 			}
 
 			// Reset accumulators for next turn
