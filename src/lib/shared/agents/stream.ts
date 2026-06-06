@@ -27,15 +27,11 @@ export async function updateActiveStream(
 	toolCalls: ActiveStream['toolCalls'],
 	segments: ActiveStream['segments']
 ): Promise<void> {
-	const t0 = performance.now();
-	await remult.repo(ActiveStream).save({
-		...stream,
+	await remult.repo(ActiveStream).update(stream.id, {
 		text,
 		toolCalls: toolCalls.map((t) => ({ ...t })),
 		segments
 	});
-	const elapsed = performance.now() - t0;
-	if (elapsed > 0.5) console.log('[perf] save took', elapsed.toFixed(2), 'ms');
 }
 
 export async function insertAssistantMessage(
