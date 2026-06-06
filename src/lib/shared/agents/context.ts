@@ -21,19 +21,21 @@ export async function buildContext(
 				return { role: 'user' as const, content: m.content, timestamp: ts };
 			}
 			if (m.role === 'assistant') {
-				const msg: Record<string, unknown> = {
-					role: 'assistant' as const,
-					content: [{ type: 'text' as const, text: m.content }],
-					timestamp: ts
-				};
-				if (m.toolCalls && m.toolCalls.length > 0) {
-					msg.toolCalls = m.toolCalls.map((tc) => ({
-						id: tc.id,
-						name: tc.name,
-						arguments: tc.args ?? {}
-					}));
+				const content: Array<Record<string, unknown>> = [];
+				if (m.content) {
+					content.push({ type: 'text' as const, text: m.content });
 				}
-				return msg;
+				if (m.toolCalls && m.toolCalls.length > 0) {
+					for (const tc of m.toolCalls) {
+						content.push({
+							type: 'toolCall' as const,
+							id: tc.id,
+							name: tc.name,
+							arguments: tc.args ?? {}
+						});
+					}
+				}
+				return { role: 'assistant' as const, content, timestamp: ts };
 			}
 			if (m.role === 'tool') {
 				return {
