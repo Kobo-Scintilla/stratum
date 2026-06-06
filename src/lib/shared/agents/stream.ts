@@ -186,10 +186,7 @@ export async function runStreamLoop(
 						break;
 					}
 
-			case 'done': {
-				if (accumulatedText || toolCalls.length > 0) {
-					await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
-
+				case 'done': {
 					// Push assistant message to context so tool results have a preceding assistant with tool_calls
 					const content: ({ type: 'text'; text: string } | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> })[] = [];
 					if (accumulatedText) content.push({ type: 'text', text: accumulatedText });
@@ -206,11 +203,15 @@ export async function runStreamLoop(
 						content,
 						timestamp: Date.now()
 					} as any);
-				}
-				break;
-			}
 
-					case 'error': {
+					// Only save assistant to DB if there's actual text (skip tool-only turns to avoid UI duplication)
+					if (accumulatedText) {
+						await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+					}
+					break;
+				}
+
+				case 'error': {
 						console.error('[stream] stream error:', event.error);
 						break;
 					}

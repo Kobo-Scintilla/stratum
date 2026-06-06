@@ -45,7 +45,7 @@
 				<ToolCall
 					toolCall={{ id: seg.toolCallId, name: seg.toolName, args: seg.args, isError: seg.isError }}
 					{result}
-					open={true}
+					open={false}
 				/>
 			</div>
 
