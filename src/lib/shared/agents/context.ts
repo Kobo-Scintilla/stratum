@@ -15,19 +15,39 @@ export async function buildContext(
 	});
 
 	const messages: Message[] = prevMessages
-		.filter((m) => m.role === 'user' || m.role === 'assistant')
 		.map((m) => {
 			const ts = m.createdAt.getTime();
 			if (m.role === 'user') {
 				return { role: 'user' as const, content: m.content, timestamp: ts };
 			}
-			return {
-				role: 'assistant' as const,
-				content: [{ type: 'text' as const, text: m.content }],
-				timestamp: ts
-			};
-		}) as Message[];
-
+			if (m.role === 'assistant') {
+				const msg: Record<string, unknown> = {
+					role: 'assistant' as const,
+					content: [{ type: 'text' as const, text: m.content }],
+					timestamp: ts
+				};
+				if (m.toolCalls && m.toolCalls.length > 0) {
+					msg.toolCalls = m.toolCalls.map((tc) => ({
+						id: tc.id,
+						name: tc.name,
+						arguments: tc.args ?? {}
+					}));
+				}
+				return msg;
+			}
+			if (m.role === 'tool') {
+				return {
+					role: 'toolResult' as const,
+					toolCallId: m.toolCallId,
+					toolName: m.toolName ?? '',
+					content: [{ type: 'text' as const, text: m.content }],
+					isError: m.isError ?? false,
+					timestamp: ts
+				};
+			}
+			return null;
+		})
+		.filter((m) => m !== null) as unknown as Message[];
 	messages.push({ role: 'user', content: prompt, timestamp: Date.now() });
 
 	const allTools = toolRegistry.getPiAiTools();
