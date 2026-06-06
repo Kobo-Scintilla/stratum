@@ -235,29 +235,26 @@ export async function runStreamLoop(
 
 				// Update segment with result
 				const seg = segments.find((s) => s.type === 'tool' && s.toolCallId === tc.id);
-				if (seg && seg.type === 'tool') {
-					seg.result = result;
-					seg.isError = isError;
-				}
-				await updateActiveStream(stream, accumulatedText, toolCalls, segments);
+			await updateActiveStream(stream, accumulatedText, toolCalls, segments);
 
-				// Add tool result to the LLM context for continuation
-				context.messages.push({
-					role: 'toolResult',
-					toolCallId: tc.id,
-					toolName: tc.name,
-					content: [{ type: 'text', text: result }],
-					isError,
-					timestamp: Date.now()
-				});
+			// Add tool result to the LLM context for continuation
+			context.messages.push({
+				role: 'toolResult' as const,
+				toolCallId: tc.id,
+				toolName: tc.name,
+				content: [{ type: 'text' as const, text: result }],
+				isError,
+				timestamp: Date.now()
+			});
 
-				// Persist tool result message
-				await persistToolResult(sessionId, tc, Date.now());
-			}
+			// Persist tool result message
+			await persistToolResult(sessionId, tc, Date.now());
+		}
 
 			// Reset accumulators for next turn
 			accumulatedText = '';
 			toolCalls = [];
+			segments = [];
 		}
 
 		// Final turn: save if there was accumulated text (text-only response, no tool calls)
