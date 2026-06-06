@@ -4,7 +4,11 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import { Navigation03Icon } from '@hugeicons/core-free-icons';
 
-	let { disabled = false, error = '', onsend }: {
+	let {
+		disabled = false,
+		error = '',
+		onsend
+	}: {
 		disabled?: boolean;
 		error?: string;
 		onsend: (text: string) => void;
@@ -27,10 +31,13 @@
 	}
 </script>
 
-<div class="border-t border-border/25 px-4 py-3">
+<div class="sticky bottom-0 border-t border-border/25 bg-background px-4 py-3">
 	<form
 		class="mx-auto flex max-w-2xl items-center gap-2"
-		onsubmit={(e) => { e.preventDefault(); submit(); }}
+		onsubmit={(e) => {
+			e.preventDefault();
+			submit();
+		}}
 	>
 		<Input
 			type="text"

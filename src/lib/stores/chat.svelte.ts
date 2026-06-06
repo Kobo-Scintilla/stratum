@@ -126,7 +126,7 @@ export function createChatSession(initialSession?: string): ChatSession {
 			if (!sid) {
 				sid = crypto.randomUUID();
 				sessionId = sid;
-				subscribe(sid);
+				await subscribe(sid);
 			}
 			isSending = true;
 			error = '';

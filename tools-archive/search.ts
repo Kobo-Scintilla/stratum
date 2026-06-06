@@ -1,6 +1,5 @@
-import { defineTool } from '@flue/runtime';
+import { adaptTool, SearchParams, IndexParams } from './types';
 import Database from 'better-sqlite3';
-import { SearchParams, IndexParams } from './types';
 import { IndexedContent, SessionEvent, getIndexedRepo, getSessionEventRepo } from '../../shared/entities/KnowledgeStore.js';
 import { initFts5, searchFts5, type FtsHit } from '../fts5';
 
@@ -97,8 +96,7 @@ async function performSearch(
 	}
 	return results;
 }
-
-export const searchTool = defineTool({
+export const searchTool = adaptTool({
 	name: 'search',
 	description: [
 		'Search all stored context across sessions. Queries run across:',
@@ -143,8 +141,7 @@ export const searchTool = defineTool({
 		return output.join('\n') || 'No results found.';
 	}
 });
-
-export const indexTool = defineTool({
+export const indexTool = adaptTool({
 	name: 'index',
 	description: [
 		'Store content in the searchable knowledge base for future retrieval.',

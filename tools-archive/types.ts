@@ -1,6 +1,29 @@
-import { Type } from '@flue/runtime';
+import { Type } from 'typebox';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
 
-// ── Execute Tool ─────────────────────────────────────────────────────
+// ── Adapter: old Flue-style tool shape → pi-agent-core AgentTool ──
+// The execute function return type changed (string → { content, details }).
+// This adapter wraps the old shape so tools keep working until rewritten.
+
+export function adaptTool(tool: {
+	name: string;
+	description: string;
+	parameters: ReturnType<typeof Type.Object>;
+	execute: (args: unknown) => unknown | Promise<unknown>;
+}): AgentTool {
+	return {
+		name: tool.name,
+		label: tool.name,
+		description: tool.description,
+		parameters: tool.parameters,
+		execute: async (_toolCallId, params, _signal, _onUpdate) => {
+			const result = await tool.execute(params);
+			return { content: [{ type: 'text', text: String(result) }], details: {} };
+		}
+	};
+}
+
+// ── Execute Tool ──────────────────────────────────────────────────
 // Sandboxed code execution. Replaces bash, python, curl, grep, etc.
 
 export const ExecuteParams = Type.Object({
@@ -27,65 +50,51 @@ export const ExecuteParams = Type.Object({
 		description: 'What you are looking for. When output exceeds ~5KB, it is auto-indexed and only matching sections are returned. Use specific technical terms.'
 	})),
 	timeout: Type.Optional(Type.Integer({
-		minimum: 1,
-		maximum: 300,
-		default: 30,
 		description: 'Execution timeout in seconds'
 	}))
 });
 
 export type ExecuteParams = { language: string; code: string; intent?: string; timeout?: number };
 
-// ── Compress (DCP-style) Tool ─────────────────────────────────────────
+// ── Compress (DCP-style) Tool ─────────────────────────────────────
 // Model-driven compression signal: "I completed this task, compress it."
 
 export const ContentBlock = Type.Object({
-	startId: Type.String({ description: 'Message ID marking the start of the block to compress' }),
-	endId: Type.String({ description: 'Message ID marking the end of the block to compress' }),
-	summary: Type.String({ description: 'Concise summary of what happened in this block' })
+	startId: Type.String({ description: 'First message ID in the compressed block' }),
+	endId: Type.String({ description: 'Last message ID in the compressed block' }),
+	summary: Type.String({ description: 'One-sentence summary of what was accomplished' })
 });
 
 export const CompressParams = Type.Object({
-	topic: Type.String({
-		description: 'What was accomplished (e.g., "root cause analysis", "bug fix applied")'
-	}),
+	topic: Type.String({ description: 'Task or topic being compressed' }),
 	content: Type.Array(ContentBlock, {
-		description: 'One or more conversation blocks to compress'
+		description: 'Conversation spans to compress'
 	})
 });
 
 export type CompressParams = { topic: string; content: { startId: string; endId: string; summary: string }[] };
 
-// ── Search Tool ───────────────────────────────────────────────────────
+// ── Search Tool ───────────────────────────────────────────────────
 // Unified knowledge search across FTS5 + persisted memory.
 
 export const SearchParams = Type.Object({
 	queries: Type.Array(Type.String(), {
-		minItems: 1,
-		maxItems: 8,
-		description: '2-4 specific technical terms describing what you need. Batch multiple questions in one call.'
+		description: 'Search terms (AND logic across queries)'
 	}),
-	scope: Type.Optional(Type.Union([
-		Type.Literal('current'),
-		Type.Literal('all')
-	], {
-		default: 'current',
-		description: '"current" = this session, "all" = all sessions'
+	scope: Type.Optional(Type.Union([Type.Literal('session'), Type.Literal('persistent')], {
+		description: 'Search scope — session memory or persistent knowledge'
 	})),
 	source: Type.Optional(Type.String({
-		description: 'Filter by source tag (e.g., "docs", "codebase", "decision")'
+		description: 'Optional source filter (e.g., "execute:python", "issue-#123")'
 	})),
 	limit: Type.Optional(Type.Integer({
-		minimum: 1,
-		maximum: 50,
-		default: 10,
-		description: 'Maximum results per query'
+		description: 'Max results per query'
 	}))
 });
 
 export type SearchParams = { queries: string[]; scope?: string; source?: string; limit?: number };
 
-// ── Index Tool ────────────────────────────────────────────────────────
+// ── Index Tool ────────────────────────────────────────────────────
 // Index content into the knowledge store for future search.
 
 export const IndexParams = Type.Object({
@@ -102,7 +111,7 @@ export const IndexParams = Type.Object({
 
 export type IndexParams = { content?: string; path?: string; source: string };
 
-// ── Handoff Tool ──────────────────────────────────────────────────────
+// ── Handoff Tool ──────────────────────────────────────────────────
 // Emergency context overflow recovery.
 
 export const HandoffParams = Type.Object({

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { createQuery } from '$lib/shared/create-query.svelte.js';
-	import { AgentService } from '$lib/shared/AgentService';
+	import { createQuery } from '$lib/stores/create-query.svelte.js';
+	import { AgentService } from '$lib/shared/services/agent-service';
 	import {
 		Loading02FreeIcons,
 		MessageMultiple02FreeIcons,

@@ -147,6 +147,19 @@ export class AgentService {
 		}> = [];
 		let segments: ActiveStream['segments'] = [];
 
+		// ── Load previous conversation from DB for session memory ──
+		const prevMessages = await remult.repo(ChatMessage).find({
+			where: { sessionId },
+			orderBy: { sortOrder: 'asc' }
+		});
+		const historyMsgs = prevMessages
+			.filter((m) => m.role === 'user' || m.role === 'assistant')
+			.map((m) => ({
+				role: m.role as 'user' | 'assistant',
+				content: m.content,
+				timestamp: m.createdAt.getTime()
+			})) as import('@earendil-works/pi-agent-core').AgentMessage[];
+
 		try {
 			let lastFlushTime = Date.now();
 			let turnAccumulatedText = '';
@@ -163,10 +176,10 @@ export class AgentService {
 			);
 
 			await runAgentLoop(
-				[userMessage],
+				[...historyMsgs, userMessage],
 				{
 					systemPrompt: '',
-					messages: [],
+					messages: historyMsgs,
 					tools: []
 				},
 				{
@@ -311,11 +324,15 @@ export class AgentService {
 			console.error('[ask] Agent stream error:', err);
 		} finally {
 			console.log('[ask] cleanup');
-			try {
-				await remult.repo(ActiveStream).delete(stream.id);
-			} catch {
-				// ignore if already gone
-			}
+			// Delay deletion so frontend liveQuery receives ChatMessage before stream disappears
+			const sid = stream.id;
+			setTimeout(() => {
+				globalThis.remultApi?.withRemult(undefined, async () => {
+					await remult.repo(ActiveStream).delete(sid);
+				}).catch(() => {
+					// ignore if already gone
+				});
+			}, 800);
 		}
 
 		return stream.id;

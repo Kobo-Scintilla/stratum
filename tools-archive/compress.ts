@@ -1,6 +1,5 @@
-import { defineTool } from '@flue/runtime';
+import { adaptTool, CompressParams } from './types';
 import { headroom } from '../headroom';
-import { CompressParams } from './types';
 import { getCompressedRepo } from '../../shared/entities/KnowledgeStore.js';
 
 // DCP-style compress tool.
@@ -64,8 +63,7 @@ function buildMessages(blocks: ContentBlock[]): Array<{ role: 'user'; content: s
 		content: `[${b.startId}..${b.endId}] ${b.summary}`
 	}));
 }
-
-export const compressTool = defineTool({
+export const compressTool = adaptTool({
 	name: 'compress',
 	description: [
 		'Signal that a task is complete. The system compresses the conversation span,',

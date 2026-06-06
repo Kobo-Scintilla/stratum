@@ -1,7 +1,6 @@
-import { defineTool } from '@flue/runtime';
+import { adaptTool, ExecuteParams } from './types';
 import { spawn } from 'node:child_process';
 import Database from 'better-sqlite3';
-import { ExecuteParams } from './types';
 import { getIndexedRepo } from '../../shared/entities/KnowledgeStore.js';
 import { initFts5, searchFts5 } from '../fts5';
 
@@ -190,8 +189,7 @@ function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 	}
 	return safe;
 }
-
-export const executeTool = defineTool({
+export const executeTool = adaptTool({
 	name: 'execute',
 	description: [
 		'Run code in a sandboxed subprocess. Languages: shell, javascript, typescript, python, ruby, go, rust, php, perl, r, elixir, csharp.',

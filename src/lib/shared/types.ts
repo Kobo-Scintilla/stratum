@@ -1,5 +1,5 @@
-import type { ActiveStream } from './entities/ActiveStream';
-import type { ChatMessage } from './entities/ChatMessage';
+import type { ActiveStream } from './entities/active-stream';
+import type { ChatMessage } from './entities/chat-message';
 
 // ── Agent Event Types ──────────────────────────────────────────
 
@@ -24,14 +24,3 @@ export type AgentEvent =
 	| { type: 'turn_end'; message: unknown; toolResults: unknown[] }
 	| { type: 'error'; error: unknown };
 
-// ── Global bridge types (used via app.d.ts) ────────────────────
-
-export interface FlueBridge {
-	agents: {
-		invoke: (
-			agentName: string,
-			sessionId: string,
-			options: { mode: string; payload: { message: string } }
-		) => AsyncIterable<AgentEvent>;
-	};
-}

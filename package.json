@@ -14,12 +14,14 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
-		"@flue/runtime": "^0.9.2",
+		"@earendil-works/pi-agent-core": "^0.78.1",
+		"@earendil-works/pi-ai": "^0.78.1",
 		"@hugeicons/core-free-icons": "^4.2.0",
 		"@hugeicons/svelte": "^1.1.2",
 		"better-sqlite3": "^12.10.0",
 		"marked": "^18.0.5",
-		"svelte-persisted-state": "^1.4.1"
+		"svelte-persisted-state": "^1.4.1",
+		"typebox": "^1.2.1"
 	},
 	"devDependencies": {
 		"@fontsource-variable/outfit": "^5.2.8",
