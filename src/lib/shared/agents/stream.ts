@@ -27,14 +27,15 @@ export async function updateActiveStream(
 	toolCalls: ActiveStream['toolCalls'],
 	segments: ActiveStream['segments']
 ): Promise<void> {
-	await withOwnContext(async () => {
-		await remult.repo(ActiveStream).save({
-			...stream,
-			text,
-			toolCalls: toolCalls.map((t) => ({ ...t })),
-			segments
-		});
+	const t0 = performance.now();
+	await remult.repo(ActiveStream).save({
+		...stream,
+		text,
+		toolCalls: toolCalls.map((t) => ({ ...t })),
+		segments
 	});
+	const elapsed = performance.now() - t0;
+	if (elapsed > 0.5) console.log('[perf] save took', elapsed.toFixed(2), 'ms');
 }
 
 export async function insertAssistantMessage(
@@ -43,18 +44,16 @@ export async function insertAssistantMessage(
 	toolCalls: TrackedToolCall[],
 	sortOrder: number
 ): Promise<void> {
-	await withOwnContext(async () => {
-		await remult.repo(ChatMessage).insert({
-			id: genId(),
-			sessionId,
-			role: 'assistant',
-			content: text,
-			toolCalls: toolCalls.length > 0
-				? toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args }))
-				: undefined,
-			sortOrder,
-			createdAt: new Date(sortOrder)
-		});
+	await remult.repo(ChatMessage).insert({
+		id: genId(),
+		sessionId,
+		role: 'assistant',
+		content: text,
+		toolCalls: toolCalls.length > 0
+			? toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args }))
+			: undefined,
+		sortOrder,
+		createdAt: new Date(sortOrder)
 	});
 }
 
@@ -62,16 +61,14 @@ export async function insertActiveStream(
 	sessionId: string,
 	prompt: string
 ): Promise<ActiveStream> {
-	return await withOwnContext(async () => {
-		return await remult.repo(ActiveStream).insert({
-			id: genId(),
-			sessionId,
-			prompt,
-			text: '',
-			isGenerating: true,
-			createdAt: new Date(),
-			toolCalls: []
-		});
+	return await remult.repo(ActiveStream).insert({
+		id: genId(),
+		sessionId,
+		prompt,
+		text: '',
+		isGenerating: true,
+		createdAt: new Date(),
+		toolCalls: []
 	});
 }
 
@@ -79,15 +76,13 @@ export async function insertUserMessage(
 	sessionId: string,
 	content: string
 ): Promise<void> {
-	await withOwnContext(async () => {
-		await remult.repo(ChatMessage).insert({
-			id: genId(),
-			sessionId,
-			role: 'user',
-			content,
-			sortOrder: Date.now(),
-			createdAt: new Date()
-		});
+	await remult.repo(ChatMessage).insert({
+		id: genId(),
+		sessionId,
+		role: 'user',
+		content,
+		sortOrder: Date.now(),
+		createdAt: new Date()
 	});
 }
 export async function runStreamLoop(
@@ -222,9 +217,7 @@ export async function runStreamLoop(
 		}
 
 		// Delete this iteration's stream now that its content is saved as ChatMessage
-		await withOwnContext(async () => {
-			await remult.repo(ActiveStream).delete(stream.id);
-		}).catch(() => {});
+		await remult.repo(ActiveStream).delete(stream.id).catch(() => {});
 
 		if (pendingToolCalls.length === 0) break;
 
