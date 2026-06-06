@@ -108,8 +108,7 @@ export async function runStreamLoop(
 	});
 	if (!stream) throw new Error(`ActiveStream ${streamId} not found`);
 
-	try {
-		while (true) {
+	while (true) {
 			const eventStream = streamSimple(model, context);
 
 			for await (const event of eventStream) {
@@ -239,10 +238,5 @@ export async function runStreamLoop(
 			// Reset accumulators for next turn (tool result text starts fresh)
 			accumulatedText = '';
 			toolCalls = [];
-			segments = [];
-		}
-	} finally {
-		// Clear active stream after all turns complete
-		await updateActiveStream(stream, '', [], []);
 	}
 }
