@@ -20,7 +20,9 @@ rmSync(DB_PATH + '-shm', { force: true });
 	const db = new Database(DB_PATH);
 	const rows = db.prepare('SELECT * FROM indexedContent').all();
 	console.log('rows:', rows);
-	const ftsRows = db.prepare("SELECT rowid, source, content FROM chunks_fts WHERE source LIKE 'execute:%'").all();
+	const ftsRows = db
+		.prepare("SELECT rowid, source, content FROM chunks_fts WHERE source LIKE 'execute:%'")
+		.all();
 	console.log('fts rows:', ftsRows);
 })().catch((e) => {
 	console.error('UNCAUGHT', e);

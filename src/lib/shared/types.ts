@@ -20,7 +20,11 @@ export type AgentEvent =
 			result: unknown;
 			isError: boolean;
 	  }
-	| { type: 'turn_request'; model: string; provider: string; input: { messages: unknown[]; tools?: unknown[] } }
+	| {
+			type: 'turn_request';
+			model: string;
+			provider: string;
+			input: { messages: unknown[]; tools?: unknown[] };
+	  }
 	| { type: 'turn_end'; message: unknown; toolResults: unknown[] }
 	| { type: 'error'; error: unknown };
-

@@ -12,7 +12,19 @@
 	import { goto } from '$app/navigation';
 	import Button from './ui/button/button.svelte';
 
-	const sessions = createQuery(() => AgentService.listSessions(), []);
+	import { getChatSession } from '$lib/stores/chat-session.svelte.js';
+
+	const sessions = createQuery<{ sessionId: string; createdAt: string; preview: string }[]>(
+		() => AgentService.listSessions(),
+		$page.data.sessions ?? []
+	);
+	const chat = getChatSession();
+
+	$effect(() => {
+		chat.sessionId;
+		chat.isSending;
+		sessions.refresh();
+	});
 
 	function timeAgo(iso: string, now: number): string {
 		const diff = now - new Date(iso).getTime();
@@ -24,10 +36,12 @@
 		const days = Math.floor(hrs / 24);
 		return `${days}d ago`;
 	}
-	let sessionsWithTime = $derived(sessions.data.map((s) => ({
-		...s,
-		time: timeAgo(s.createdAt, Date.now())
-	})));
+	let sessionsWithTime = $derived(
+		sessions.data.map((s) => ({
+			...s,
+			time: timeAgo(s.createdAt, Date.now())
+		}))
+	);
 </script>
 
 <Sidebar.Header class="gap-3.5 border-b px-4">
@@ -36,7 +50,9 @@
 			<Icon icon={MessageMultiple02FreeIcons} class="size-4 text-primary" />
 		</div>
 		<span class="text-sm font-medium">Chat</span>
-		<Button size="icon-xs" class="ml-auto" onclick={() => goto('/dashboard')}><Icon icon={PlusSignIcon} /></Button>
+		<Button size="icon-xs" class="ml-auto" onclick={() => goto('/dashboard')}
+			><Icon icon={PlusSignIcon} /></Button
+		>
 	</div>
 	<Sidebar.Input placeholder="Search sessions..." />
 </Sidebar.Header>

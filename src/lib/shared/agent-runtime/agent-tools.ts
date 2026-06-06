@@ -1,7 +1,7 @@
 import { Type } from '@earendil-works/pi-ai';
 import type { ToolDefinition, ToolResult } from './types';
 import type { Tool as PiAiTool } from '@earendil-works/pi-ai';
-import { getTimeTool } from './tools/get_time';
+import { getTimeTool } from './tools/get-time';
 
 export type { ToolDefinition, ToolResult };
 
@@ -20,7 +20,7 @@ export class ToolRegistry {
 		return Array.from(this.tools.values()).map((t) => ({
 			name: t.name,
 			description: t.description,
-			parameters: t.parameters,
+			parameters: t.parameters
 		}));
 	}
 

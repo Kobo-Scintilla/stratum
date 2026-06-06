@@ -28,7 +28,10 @@ describe('executeTool', () => {
 	});
 
 	it('should run JavaScript code', async () => {
-		const result = await executeTool.execute({ language: 'javascript', code: 'console.log(2 + 2)' });
+		const result = await executeTool.execute({
+			language: 'javascript',
+			code: 'console.log(2 + 2)'
+		});
 		assert.ok(result.includes('4'), `Expected "4" in result, got: ${result}`);
 	});
 });
@@ -41,7 +44,10 @@ describe('compressTool', () => {
 			topic: 'bug fix applied',
 			content: [{ startId: 'msg_1', endId: 'msg_5', summary: 'Fixed off-by-one error' }]
 		});
-		assert.ok(result.includes('Compression complete'), `Expected "Compression complete" in result, got: ${result}`);
+		assert.ok(
+			result.includes('Compression complete'),
+			`Expected "Compression complete" in result, got: ${result}`
+		);
 		assert.ok(result.includes('bug fix applied'), `Expected topic in result, got: ${result}`);
 	});
 
@@ -52,16 +58,10 @@ describe('compressTool', () => {
 		} as const;
 
 		const first = await compressTool.execute(args);
-		assert.ok(
-			first.includes('Compression complete'),
-			`First call should succeed, got: ${first}`
-		);
+		assert.ok(first.includes('Compression complete'), `First call should succeed, got: ${first}`);
 
 		const second = await compressTool.execute(args);
-		assert.ok(
-			second.includes('Duplicate'),
-			`Second call should report duplicate, got: ${second}`
-		);
+		assert.ok(second.includes('Duplicate'), `Second call should report duplicate, got: ${second}`);
 	});
 });
 
@@ -70,7 +70,10 @@ describe('compressTool', () => {
 describe('searchTool', () => {
 	it('should return graceful message when store unavailable', async () => {
 		const result = await searchTool.execute({ queries: ['nonexistent'] });
-		assert.ok(result.includes('Knowledge store unavailable'), `Expected fallback message, got: ${result}`);
+		assert.ok(
+			result.includes('Knowledge store unavailable'),
+			`Expected fallback message, got: ${result}`
+		);
 	});
 });
 

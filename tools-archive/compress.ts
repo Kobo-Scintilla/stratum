@@ -27,7 +27,9 @@ async function ensureRemult(): Promise<void> {
 // Without an explicit request cycle, repo.insert throws "remult object was
 // requested outside of a valid request cycle".
 function runInRemultContext<T>(fn: () => Promise<T>): Promise<T> {
-	const api = globalThis.remultApi as { withRemult: <U>(req: undefined, what: () => Promise<U>) => Promise<U> } | undefined;
+	const api = globalThis.remultApi as
+		| { withRemult: <U>(req: undefined, what: () => Promise<U>) => Promise<U> }
+		| undefined;
 	if (api) return api.withRemult(undefined, fn);
 	return fn();
 }
@@ -144,9 +146,10 @@ export const compressTool = adaptTool({
 		for (const b of fresh) rememberInvocation(`${topic}:${b.summary}`);
 
 		// 5. Return a structured, model-readable summary.
-		const tokensLine = headroomSaved !== null
-			? `Tokens saved (Headroom est.): ~${headroomSaved}`
-			: `Tokens saved (estimate): ~${tokensSaved} (Headroom unavailable)`;
+		const tokensLine =
+			headroomSaved !== null
+				? `Tokens saved (Headroom est.): ~${headroomSaved}`
+				: `Tokens saved (estimate): ~${tokensSaved} (Headroom unavailable)`;
 
 		const storedLine = artifactId
 			? `Stored in CompressedArtifact (id: ${artifactId}).`

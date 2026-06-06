@@ -1,0 +1,21 @@
+import { Entity, Fields } from 'remult';
+
+@Entity('providerSettings', {
+	allowApiCrud: true
+})
+export class ProviderSetting {
+	@Fields.string()
+	id!: string; // e.g., 'openai-responses' or custom provider id
+
+	@Fields.string()
+	apiKey = ''; // encrypted value
+
+	@Fields.string({ allowNull: true })
+	baseUrl?: string; // for custom providers
+
+	@Fields.string({ allowNull: true })
+	apiType?: string; // 'openai-completions' | 'openai-responses' | 'anthropic-messages'
+
+	@Fields.string({ allowNull: true })
+	models?: string; // comma-separated model IDs for custom providers
+}

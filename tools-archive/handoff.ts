@@ -55,9 +55,7 @@ export function formatHandoffForPrompt(artifact: HandoffArtifact): string {
 		artifact.currentState.status,
 		'',
 		'### Prior Decisions',
-		...artifact.priorDecisions.map(
-			(d) => `- **${d.decision}** — ${d.rationale}`
-		),
+		...artifact.priorDecisions.map((d) => `- **${d.decision}** — ${d.rationale}`),
 		'',
 		'### Remaining Steps',
 		...artifact.remainingSteps.map((s, i) => `${i + 1}. ${s}`),

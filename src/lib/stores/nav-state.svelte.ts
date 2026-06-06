@@ -4,7 +4,7 @@ import { browser } from '$app/environment';
 
 /* ─── Types ─── */
 
-export type TabId = 'sessions';
+export type TabId = 'sessions' | 'providers';
 
 export type NavItem = {
 	id: TabId;
@@ -14,11 +14,12 @@ export type NavItem = {
 
 /* ─── Nav items ─── */
 
-import { Message01FreeIcons } from '@hugeicons/core-free-icons';
+import { Message01FreeIcons, Settings02FreeIcons } from '@hugeicons/core-free-icons';
 import type { IconSvgElement } from '@hugeicons/svelte';
 
 export const navItems: NavItem[] = [
-	{ id: 'sessions', title: 'Sessions', icon: Message01FreeIcons }
+	{ id: 'sessions', title: 'Sessions', icon: Message01FreeIcons },
+	{ id: 'providers', title: 'Providers', icon: Settings02FreeIcons }
 ];
 
 /* ─── Per-request nav state via context ─── */
@@ -35,7 +36,8 @@ function writeCookie(value: unknown) {
  * Create nav state inside root layout.
  * `ssrValue` comes from +layout.server.ts cookie read — prevents hydration flash.
  */
-export function createNavState(ssrValue: string | null) {
+export function createNavState(ssrValueOrFn: string | null | (() => string | null)) {
+	const ssrValue = typeof ssrValueOrFn === 'function' ? ssrValueOrFn() : ssrValueOrFn;
 	const state = persistedState<TabId | null>(KEY, ssrValue as TabId | null, {
 		storage: 'local',
 		syncTabs: true

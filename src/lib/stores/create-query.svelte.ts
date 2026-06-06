@@ -1,3 +1,5 @@
+import { browser } from '$app/environment';
+
 export interface QueryState<T> {
 	readonly data: T;
 	readonly loading: boolean;
@@ -19,7 +21,9 @@ export function createQuery<T>(fetcher: () => Promise<T>, initial: T): QueryStat
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 
-	queueMicrotask(() => refresh());
+	if (browser) {
+		queueMicrotask(() => refresh());
+	}
 
 	async function refresh() {
 		loading = true;

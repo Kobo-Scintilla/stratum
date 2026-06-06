@@ -2,17 +2,20 @@ import { remult } from 'remult';
 import { ChatMessage } from '../entities/chat-message';
 import type { Context, Message } from './types';
 import type { AgentConfig } from './types';
-import { toolRegistry } from './tools';
+import { toolRegistry } from './agent-tools';
 
 export async function buildContext(
 	sessionId: string,
 	config: AgentConfig,
 	prompt: string
 ): Promise<Context> {
+	const limit = config.contextWindow ?? 20;
 	const prevMessages = await remult.repo(ChatMessage).find({
 		where: { sessionId },
-		orderBy: { sortOrder: 'asc' }
+		orderBy: { sortOrder: 'desc' },
+		limit
 	});
+	prevMessages.reverse();
 
 	const messages: Message[] = prevMessages
 		.map((m) => {

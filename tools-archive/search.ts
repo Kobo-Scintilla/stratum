@@ -1,6 +1,11 @@
 import { adaptTool, SearchParams, IndexParams } from './types';
 import Database from 'better-sqlite3';
-import { IndexedContent, SessionEvent, getIndexedRepo, getSessionEventRepo } from '../../shared/entities/KnowledgeStore.js';
+import {
+	IndexedContent,
+	SessionEvent,
+	getIndexedRepo,
+	getSessionEventRepo
+} from '../../shared/entities/KnowledgeStore.js';
 import { initFts5, searchFts5, type FtsHit } from '../fts5';
 
 async function ensureRemult(): Promise<void> {
@@ -9,7 +14,9 @@ async function ensureRemult(): Promise<void> {
 }
 
 function runInRemultContext<T>(fn: () => Promise<T>): Promise<T> {
-	const api = globalThis.remultApi as { withRemult: <U>(req: undefined, what: () => Promise<U>) => Promise<U> } | undefined;
+	const api = globalThis.remultApi as
+		| { withRemult: <U>(req: undefined, what: () => Promise<U>) => Promise<U> }
+		| undefined;
 	if (api) return api.withRemult(undefined, fn);
 	return fn();
 }
@@ -52,36 +59,29 @@ async function performSearch(
 		try {
 			ftsHits = searchFts5(ftsDb, escapeFtsQuery(query), limit);
 		} catch (_ftsErr) {
-			const contentFilter = [
-				{ content: { $contains: q } },
-				{ source: { $contains: q } }
-			];
+			const contentFilter = [{ content: { $contains: q } }, { source: { $contains: q } }];
 			const contentResults = await repo.find({
 				where: { $or: contentFilter },
 				limit,
 				orderBy: { createdAt: 'desc' }
 			});
 			for (const item of contentResults) {
-				const excerpt = item.content.length > 200
-					? item.content.substring(0, 200) + '...'
-					: item.content;
+				const excerpt =
+					item.content.length > 200 ? item.content.substring(0, 200) + '...' : item.content;
 				results.push(`[Indexed] ${item.source} (${item.contentType}): ${excerpt}`);
 			}
 		}
 		for (const hit of ftsHits) {
 			if (source && hit.source !== source) continue;
-			const excerpt = hit.content.length > 200
-				? hit.content.substring(0, 200)
-				: hit.content;
-			results.push(`[Indexed] (bm25=${hit.score.toFixed(2)}) source=${hit.source} type=${hit.contentType}: ${excerpt}`);
+			const excerpt = hit.content.length > 200 ? hit.content.substring(0, 200) : hit.content;
+			results.push(
+				`[Indexed] (bm25=${hit.score.toFixed(2)}) source=${hit.source} type=${hit.contentType}: ${excerpt}`
+			);
 		}
 		if (scope === 'all' || results.length < limit) {
 			const eventResults = await eventRepo.find({
 				where: {
-					$or: [
-						{ summary: { $contains: q } },
-						{ detail: { $contains: q } }
-					]
+					$or: [{ summary: { $contains: q } }, { detail: { $contains: q } }]
 				},
 				limit: limit - results.length,
 				orderBy: { createdAt: 'desc' }
@@ -172,11 +172,14 @@ export const indexTool = adaptTool({
 		}
 
 		// Detect content type
-		const contentType = textToIndex.trim().startsWith('{') || textToIndex.trim().startsWith('[')
-			? 'json'
-			: textToIndex.includes('```') || textToIndex.includes('function ') || textToIndex.includes('class ')
-				? 'code'
-				: 'text';
+		const contentType =
+			textToIndex.trim().startsWith('{') || textToIndex.trim().startsWith('[')
+				? 'json'
+				: textToIndex.includes('```') ||
+					  textToIndex.includes('function ') ||
+					  textToIndex.includes('class ')
+					? 'code'
+					: 'text';
 
 		// Store as chunks (split by double newlines for simplicity)
 		const chunks = textToIndex.split(/\n\n+/).filter(Boolean);
@@ -185,7 +188,7 @@ export const indexTool = adaptTool({
 		// In a SvelteKit request cycle remultApi.withRemult is already
 		// active; in CLI / test contexts we lazy-load the api module
 		// and wrap the inserts in withRemult so Remult sees a valid
-	// request context (otherwise repo.insert throws "remult object
+		// request context (otherwise repo.insert throws "remult object
 		// was requested outside of a valid request cycle").
 		let chunkIndex = 0;
 		await ensureRemult();

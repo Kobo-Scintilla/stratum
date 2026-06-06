@@ -12,9 +12,4 @@ import { compressTool } from './compress';
 import { searchTool, indexTool } from './search';
 
 // All custom tools ready for agent registration
-export const allTools: AgentTool[] = [
-	executeTool,
-	compressTool,
-	searchTool,
-	indexTool
-];
+export const allTools: AgentTool[] = [executeTool, compressTool, searchTool, indexTool];

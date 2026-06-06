@@ -4,7 +4,12 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	server: {
+		watch: {
+			ignored: ['**/db.sqlite', '**/db.sqlite-wal', '**/db.sqlite-shm']
+		}
+	},
 	ssr: {
-		noExternal: ['@hugeicons/svelte']
+		noExternal: ['@hugeicons/svelte', '@hugeicons/core-free-icons']
 	}
 });

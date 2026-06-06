@@ -8,6 +8,7 @@ export interface AgentConfig {
 	modelId: string;
 	systemPrompt?: string;
 	toolNames: string[];
+	contextWindow?: number;
 }
 
 /** A tool that an agent can call. */

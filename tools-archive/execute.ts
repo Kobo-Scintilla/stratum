@@ -43,7 +43,11 @@ function runInRemultContext<T>(fn: () => Promise<T>): Promise<T> {
 	// installed (e.g. we somehow reach this code path with no server),
 	// just run the function — Remult will throw a clear error and the
 	// caller's catch will surface it.
-	const api = (globalThis as { remultApi?: { withRemult: (req: undefined, what: () => Promise<T>) => Promise<T> } }).remultApi;
+	const api = (
+		globalThis as {
+			remultApi?: { withRemult: (req: undefined, what: () => Promise<T>) => Promise<T> };
+		}
+	).remultApi;
 	if (api) return api.withRemult(undefined, fn);
 	return fn();
 }
@@ -51,7 +55,8 @@ function runInRemultContext<T>(fn: () => Promise<T>): Promise<T> {
 function detectContentType(chunk: string): 'json' | 'code' | 'text' {
 	const trimmed = chunk.trimStart();
 	if (trimmed.startsWith('{') || trimmed.startsWith('[')) return 'json';
-	if (chunk.includes('```') || chunk.includes('function ') || chunk.includes('class ')) return 'code';
+	if (chunk.includes('```') || chunk.includes('function ') || chunk.includes('class '))
+		return 'code';
 	return 'text';
 }
 
@@ -134,8 +139,12 @@ function getRuntimeCommand(language: string, code: string): string {
 		typescript: (c) => `npx --yes tsx -e ${escapeArg(c)}`,
 		python: (c) => `python3 -c ${escapeArg(c)}`,
 		ruby: (c) => `ruby -e ${escapeArg(c)}`,
-		go: (c) => { throw new Error('Go is not supported in quick-exec mode. Use shell and run a temp file.'); },
-		rust: () => { throw new Error('Rust is not supported in quick-exec mode. Use shell and run cargo.'); },
+		go: (c) => {
+			throw new Error('Go is not supported in quick-exec mode. Use shell and run a temp file.');
+		},
+		rust: () => {
+			throw new Error('Rust is not supported in quick-exec mode. Use shell and run cargo.');
+		},
 		php: (c) => `php -r ${escapeArg(c)}`,
 		perl: (c) => `perl -e ${escapeArg(c)}`,
 		r: (c) => `Rscript -e ${escapeArg(c)}`,
@@ -161,10 +170,19 @@ function parseCommand(cmd: string): string[] {
 
 	for (let i = 0; i < cmd.length; i++) {
 		const c = cmd[i];
-		if (c === "'" && !inDouble) { inSingle = !inSingle; continue; }
-		if (c === '"' && !inSingle) { inDouble = !inDouble; continue; }
+		if (c === "'" && !inDouble) {
+			inSingle = !inSingle;
+			continue;
+		}
+		if (c === '"' && !inSingle) {
+			inDouble = !inDouble;
+			continue;
+		}
 		if (c === ' ' && !inSingle && !inDouble) {
-			if (current) { args.push(current); current = ''; }
+			if (current) {
+				args.push(current);
+				current = '';
+			}
 			continue;
 		}
 		if (c === '\\' && inDouble) {
@@ -180,8 +198,14 @@ function parseCommand(cmd: string): string[] {
 function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 	const safe: Record<string, string> = {};
 	const allowlist = new Set([
-		'PATH', 'HOME', 'USER', 'SHELL', 'TMPDIR', 'NODE_PATH',
-		'LANG', 'LC_ALL'
+		'PATH',
+		'HOME',
+		'USER',
+		'SHELL',
+		'TMPDIR',
+		'NODE_PATH',
+		'LANG',
+		'LC_ALL'
 	]);
 	for (const key of allowlist) {
 		const val = env[key];
@@ -261,10 +285,19 @@ function formatResultHead(run: RunResult, _intent: string | undefined): string |
 // shorter than CHUNK_MIN_CHARS (noise), and persist each chunk to the
 // FTS5-backed IndexedContent table. The inserted rows flow into
 // chunks_fts via the triggers installed by initFts5 in api.ts.
-async function indexOutput({ fullOut, source }: { fullOut: string; source: string }): Promise<number> {
+async function indexOutput({
+	fullOut,
+	source
+}: {
+	fullOut: string;
+	source: string;
+}): Promise<number> {
 	try {
 		await ensureRemult();
-		const chunks = fullOut.split(/\n\n+/).map((c) => c.trim()).filter((c) => c.length >= CHUNK_MIN_CHARS);
+		const chunks = fullOut
+			.split(/\n\n+/)
+			.map((c) => c.trim())
+			.filter((c) => c.length >= CHUNK_MIN_CHARS);
 		if (chunks.length === 0) return 0;
 		const repo = getIndexedRepo();
 		const contentType = detectContentType(fullOut);
@@ -297,14 +330,28 @@ async function indexOutput({ fullOut, source }: { fullOut: string; source: strin
 // ftsDb (the second sqlite handle) to run a MATCH query against
 // chunks_fts; the fts5 module's searchFts5 joins back to indexedContent
 // and orders by bm25() ascending (lower = better match).
-function formatIntentPreview({ intent, source, fullOut, stored }: { intent: string; source: string; fullOut: string; stored: number }): string {
+function formatIntentPreview({
+	intent,
+	source,
+	fullOut,
+	stored
+}: {
+	intent: string;
+	source: string;
+	fullOut: string;
+	stored: number;
+}): string {
 	let hits: Array<{ content: string; score: number; source: string }>;
 	try {
 		hits = searchFts5(ftsDb, intent, INTENT_HIT_LIMIT);
 	} catch (err) {
 		// FTS query parse error (e.g. intent contained an unbalanced
 		// quote) — degrade to the pointer rather than failing the call.
-		return formatPointer({ run: { fullOut, inlineOut: '', stderr: '', exitCode: 0, totalBytes: fullOut.length }, source, stored });
+		return formatPointer({
+			run: { fullOut, inlineOut: '', stderr: '', exitCode: 0, totalBytes: fullOut.length },
+			source,
+			stored
+		});
 	}
 
 	if (hits.length === 0) {
@@ -320,24 +367,37 @@ function formatIntentPreview({ intent, source, fullOut, stored }: { intent: stri
 
 	const lines: string[] = [];
 	lines.push(`Auto-indexed ${stored} chunks to source "${source}" (intent: "${intent}").`);
-	lines.push(`Top ${hits.length} matching section${hits.length === 1 ? '' : 's'} (BM25, lower score = better match):`);
+	lines.push(
+		`Top ${hits.length} matching section${hits.length === 1 ? '' : 's'} (BM25, lower score = better match):`
+	);
 	lines.push('');
 	for (let i = 0; i < hits.length; i++) {
 		const h = hits[i];
-		const preview = h.content.length > INTENT_PREVIEW_CHARS
-			? h.content.slice(0, INTENT_PREVIEW_CHARS) + '...'
-			: h.content;
+		const preview =
+			h.content.length > INTENT_PREVIEW_CHARS
+				? h.content.slice(0, INTENT_PREVIEW_CHARS) + '...'
+				: h.content;
 		lines.push(`[${i + 1}] score=${h.score.toFixed(3)}`);
 		lines.push(preview);
 		lines.push('');
 	}
-	lines.push(`To retrieve a specific section in full: search(queries: ["${intent}"], source: "${source}")`);
+	lines.push(
+		`To retrieve a specific section in full: search(queries: ["${intent}"], source: "${source}")`
+	);
 	return lines.join('\n').trimEnd();
 }
 
 // Pointer returned when output is large but no intent is set. Mirrors
 // the text the user sees so they can immediately reach for search().
-function formatPointer({ run, source, stored }: { run: RunResult; source: string; stored: number }): string {
+function formatPointer({
+	run,
+	source,
+	stored
+}: {
+	run: RunResult;
+	source: string;
+	stored: number;
+}): string {
 	const head = `Output exceeds 100KB. Auto-indexed to search(). ${stored} chunks stored under source "${source}".`;
 	if (stored <= 0) {
 		// Indexing failed (knowledge store unavailable, all chunks

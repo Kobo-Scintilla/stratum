@@ -17,11 +17,11 @@ describe('FTS5 schema', () => {
 			initFts5(db);
 
 			const rows = db
-				.prepare("SELECT type, name FROM sqlite_master WHERE name IN (?, ?, ?, ?)")
+				.prepare('SELECT type, name FROM sqlite_master WHERE name IN (?, ?, ?, ?)')
 				.all('chunks_fts', 'chunks_fts_ai', 'chunks_fts_ad', 'chunks_fts_au') as Array<{
-					type: string;
-					name: string;
-				}>;
+				type: string;
+				name: string;
+			}>;
 
 			const byName = new Map(rows.map((r) => [r.name, r.type]));
 

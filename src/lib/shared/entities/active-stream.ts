@@ -23,11 +23,24 @@ export class ActiveStream {
 	createdAt = new Date();
 
 	@Fields.json()
-	toolCalls: Array<{ id: string; name: string; args: unknown; result?: unknown; isError?: boolean }> = [];
+	toolCalls: Array<{
+		id: string;
+		name: string;
+		args: unknown;
+		result?: unknown;
+		isError?: boolean;
+	}> = [];
 
 	@Fields.json()
 	segments: Array<
 		| { type: 'text'; text: string }
-		| { type: 'tool'; toolCallId: string; toolName: string; args: unknown; result?: unknown; isError?: boolean }
+		| {
+				type: 'tool';
+				toolCallId: string;
+				toolName: string;
+				args: unknown;
+				result?: unknown;
+				isError?: boolean;
+		  }
 	> = [];
 }

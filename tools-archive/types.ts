@@ -27,31 +27,40 @@ export function adaptTool(tool: {
 // Sandboxed code execution. Replaces bash, python, curl, grep, etc.
 
 export const ExecuteParams = Type.Object({
-	language: Type.Union([
-		Type.Literal('shell'),
-		Type.Literal('javascript'),
-		Type.Literal('typescript'),
-		Type.Literal('python'),
-		Type.Literal('ruby'),
-		Type.Literal('go'),
-		Type.Literal('rust'),
-		Type.Literal('php'),
-		Type.Literal('perl'),
-		Type.Literal('r'),
-		Type.Literal('elixir'),
-		Type.Literal('csharp')
-	], {
-		description: 'Language runtime for the code'
-	}),
+	language: Type.Union(
+		[
+			Type.Literal('shell'),
+			Type.Literal('javascript'),
+			Type.Literal('typescript'),
+			Type.Literal('python'),
+			Type.Literal('ruby'),
+			Type.Literal('go'),
+			Type.Literal('rust'),
+			Type.Literal('php'),
+			Type.Literal('perl'),
+			Type.Literal('r'),
+			Type.Literal('elixir'),
+			Type.Literal('csharp')
+		],
+		{
+			description: 'Language runtime for the code'
+		}
+	),
 	code: Type.String({
-		description: 'Code to execute in the sandbox. Only stdout enters your conversation memory — raw bytes stay in the sandbox.'
+		description:
+			'Code to execute in the sandbox. Only stdout enters your conversation memory — raw bytes stay in the sandbox.'
 	}),
-	intent: Type.Optional(Type.String({
-		description: 'What you are looking for. When output exceeds ~5KB, it is auto-indexed and only matching sections are returned. Use specific technical terms.'
-	})),
-	timeout: Type.Optional(Type.Integer({
-		description: 'Execution timeout in seconds'
-	}))
+	intent: Type.Optional(
+		Type.String({
+			description:
+				'What you are looking for. When output exceeds ~5KB, it is auto-indexed and only matching sections are returned. Use specific technical terms.'
+		})
+	),
+	timeout: Type.Optional(
+		Type.Integer({
+			description: 'Execution timeout in seconds'
+		})
+	)
 });
 
 export type ExecuteParams = { language: string; code: string; intent?: string; timeout?: number };
@@ -72,7 +81,10 @@ export const CompressParams = Type.Object({
 	})
 });
 
-export type CompressParams = { topic: string; content: { startId: string; endId: string; summary: string }[] };
+export type CompressParams = {
+	topic: string;
+	content: { startId: string; endId: string; summary: string }[];
+};
 
 // ── Search Tool ───────────────────────────────────────────────────
 // Unified knowledge search across FTS5 + persisted memory.
@@ -81,15 +93,21 @@ export const SearchParams = Type.Object({
 	queries: Type.Array(Type.String(), {
 		description: 'Search terms (AND logic across queries)'
 	}),
-	scope: Type.Optional(Type.Union([Type.Literal('session'), Type.Literal('persistent')], {
-		description: 'Search scope — session memory or persistent knowledge'
-	})),
-	source: Type.Optional(Type.String({
-		description: 'Optional source filter (e.g., "execute:python", "issue-#123")'
-	})),
-	limit: Type.Optional(Type.Integer({
-		description: 'Max results per query'
-	}))
+	scope: Type.Optional(
+		Type.Union([Type.Literal('session'), Type.Literal('persistent')], {
+			description: 'Search scope — session memory or persistent knowledge'
+		})
+	),
+	source: Type.Optional(
+		Type.String({
+			description: 'Optional source filter (e.g., "execute:python", "issue-#123")'
+		})
+	),
+	limit: Type.Optional(
+		Type.Integer({
+			description: 'Max results per query'
+		})
+	)
 });
 
 export type SearchParams = { queries: string[]; scope?: string; source?: string; limit?: number };
@@ -98,12 +116,16 @@ export type SearchParams = { queries: string[]; scope?: string; source?: string;
 // Index content into the knowledge store for future search.
 
 export const IndexParams = Type.Object({
-	content: Type.Optional(Type.String({
-		description: 'Text content to index (markdown, code, plain text)'
-	})),
-	path: Type.Optional(Type.String({
-		description: 'File path or URL to index (alternative to inline content)'
-	})),
+	content: Type.Optional(
+		Type.String({
+			description: 'Text content to index (markdown, code, plain text)'
+		})
+	),
+	path: Type.Optional(
+		Type.String({
+			description: 'File path or URL to index (alternative to inline content)'
+		})
+	),
 	source: Type.String({
 		description: 'Source label for scoping future searches (e.g., "react-docs", "issue-#123")'
 	})
@@ -125,4 +147,9 @@ export const HandoffParams = Type.Object({
 	})
 });
 
-export type HandoffParams = { objective: string; priorDecisions: string[]; currentState: string; nextSteps: string[] };
+export type HandoffParams = {
+	objective: string;
+	priorDecisions: string[];
+	currentState: string;
+	nextSteps: string[];
+};

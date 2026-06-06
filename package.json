@@ -4,12 +4,12 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev --host 0.0.0.0",
-		"build": "vite build",
+		"dev": "NODE_OPTIONS='--no-deprecation' vite dev --host 0.0.0.0",
+		"build": "NODE_OPTIONS='--no-deprecation' vite build",
 		"preview": "vite preview",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"prepare": "svelte-kit sync",
+		"check": "NODE_OPTIONS='--no-deprecation' svelte-kit sync && NODE_OPTIONS='--no-deprecation' svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "NODE_OPTIONS='--no-deprecation' svelte-kit sync && NODE_OPTIONS='--no-deprecation' svelte-check --tsconfig ./tsconfig.json --watch",
+		"prepare": "NODE_OPTIONS='--no-deprecation' svelte-kit sync",
 		"lint": "prettier --check .",
 		"format": "prettier --write ."
 	},
@@ -26,7 +26,6 @@
 	"devDependencies": {
 		"@fontsource-variable/outfit": "^5.2.8",
 		"@internationalized/date": "^3.12.2",
-		"@lucide/svelte": "^0.577.0",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.62.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",

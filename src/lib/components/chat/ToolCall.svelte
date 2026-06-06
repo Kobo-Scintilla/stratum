@@ -12,7 +12,11 @@
 		isError: boolean;
 	}
 
-	let { toolCall, result, open = false }: {
+	let {
+		toolCall,
+		result,
+		open = false
+	}: {
 		toolCall: ToolCallData;
 		result?: ToolResult | null;
 		open?: boolean;
@@ -20,7 +24,9 @@
 </script>
 
 <details class="rounded-lg border border-muted-foreground/20" {open}>
-	<summary class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-primary hover:bg-muted/30">
+	<summary
+		class="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium text-primary hover:bg-muted/30"
+	>
 		<span class="inline-block size-1.5 rounded-full bg-current"></span>
 		{toolCall.name}
 		{#if result?.isError || toolCall.isError}
@@ -30,13 +36,22 @@
 	<div class="border-t border-muted-foreground/20 px-3 py-2">
 		{#if toolCall.args}
 			<div class="mb-1.5">
-				<span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Args</span>
-				<pre class="mt-0.5 whitespace-pre-wrap font-mono text-xs text-muted-foreground">{JSON.stringify(toolCall.args, null, 2)}</pre>
+				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
+					>Args</span
+				>
+				<pre
+					class="mt-0.5 font-mono text-xs whitespace-pre-wrap text-muted-foreground">{JSON.stringify(
+						toolCall.args,
+						null,
+						2
+					)}</pre>
 			</div>
 		{/if}
 		{#if result}
 			<div>
-				<span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Result</span>
+				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
+					>Result</span
+				>
 				<div class="mt-0.5 max-h-32 overflow-y-auto rounded bg-background/50 p-2">
 					<Markdown content={result.result} />
 				</div>

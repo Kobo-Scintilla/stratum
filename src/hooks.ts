@@ -1,9 +1,11 @@
 import { repo, type ClassType } from 'remult';
 import { ActiveStream } from '$lib/shared/entities/active-stream';
 import { ChatMessage } from '$lib/shared/entities/chat-message';
+import { ProviderSetting } from '$lib/shared/entities/provider-setting';
+import { ChatSessionSettings } from '$lib/shared/entities/chat-session-settings';
 import type { Transport } from '@sveltejs/kit';
 
-const ENTITIES = [ActiveStream, ChatMessage] as const;
+const ENTITIES = [ActiveStream, ChatMessage, ProviderSetting, ChatSessionSettings] as const;
 type EntityClass = (typeof ENTITIES)[number];
 
 function repoFor(e: EntityClass) {

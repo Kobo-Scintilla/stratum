@@ -10,7 +10,9 @@ declare global {
 		// interface Platform {}
 	}
 
-	var remultApi: { withRemult(event: undefined, what: () => Promise<void>): Promise<void> } | undefined;
+	var remultApi:
+		| { withRemult(event: undefined, what: () => Promise<void>): Promise<void> }
+		| undefined;
 }
 
 export {};

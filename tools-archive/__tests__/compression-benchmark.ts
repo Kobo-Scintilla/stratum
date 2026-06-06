@@ -27,14 +27,16 @@ async function compressViaHeadroom(messages: unknown[]): Promise<HeadroomResult>
 function generateToolOutput(schema: string, rows: number): string {
 	const items: string[] = [];
 	for (let i = 0; i < rows; i++) {
-		items.push(JSON.stringify({
-			id: i,
-			name: `item_${i}`,
-			status: i % 3 === 0 ? 'error' : 'ok',
-			value: Math.random() * 1000,
-			tags: ['test', `group_${i % 10}`],
-			timestamp: new Date().toISOString()
-		}));
+		items.push(
+			JSON.stringify({
+				id: i,
+				name: `item_${i}`,
+				status: i % 3 === 0 ? 'error' : 'ok',
+				value: Math.random() * 1000,
+				tags: ['test', `group_${i % 10}`],
+				timestamp: new Date().toISOString()
+			})
+		);
 	}
 	return '[\n' + items.join(',\n') + '\n]';
 }
@@ -95,11 +97,19 @@ function generateCodeOutput(): string {
 function generateConversation(turns: number) {
 	const messages: unknown[] = [{ role: 'system', content: 'You are a helpful assistant.' }];
 	for (let i = 0; i < turns; i++) {
-		messages.push({ role: 'user', content: `Question ${i}: What is the status of deployment ${i}?` });
+		messages.push({
+			role: 'user',
+			content: `Question ${i}: What is the status of deployment ${i}?`
+		});
 		messages.push({
 			role: 'assistant',
 			content: [
-				{ type: 'tool_use', id: `tool_${i}`, name: 'execute', input: { language: 'shell', code: `echo "checking deployment ${i}"` } }
+				{
+					type: 'tool_use',
+					id: `tool_${i}`,
+					name: 'execute',
+					input: { language: 'shell', code: `echo "checking deployment ${i}"` }
+				}
 			]
 		});
 		messages.push({
@@ -129,7 +139,9 @@ async function runBenchmark() {
 		console.log(`  Before: ${result.tokens_before} tokens`);
 		console.log(`  After:  ${result.tokens_after} tokens`);
 		console.log(`  Ratio:  ${(result.compression_ratio * 100).toFixed(1)}%`);
-		console.log(`  Saved:  ${(result.tokens_before - result.tokens_after).toLocaleString()} tokens`);
+		console.log(
+			`  Saved:  ${(result.tokens_before - result.tokens_after).toLocaleString()} tokens`
+		);
 	} catch (e) {
 		console.log(`  SKIP: Headroom unavailable (${e})`);
 	}
@@ -142,7 +154,9 @@ async function runBenchmark() {
 		console.log(`  Before: ${result.tokens_before} tokens`);
 		console.log(`  After:  ${result.tokens_after} tokens`);
 		console.log(`  Ratio:  ${(result.compression_ratio * 100).toFixed(1)}%`);
-		console.log(`  Saved:  ${(result.tokens_before - result.tokens_after).toLocaleString()} tokens`);
+		console.log(
+			`  Saved:  ${(result.tokens_before - result.tokens_after).toLocaleString()} tokens`
+		);
 	} catch (e) {
 		console.log(`  SKIP: Headroom unavailable (${e})`);
 	}
@@ -152,8 +166,15 @@ async function runBenchmark() {
 	const largeOutput: unknown[] = [
 		{ role: 'system', content: 'You are a helpful assistant.' },
 		{ role: 'user', content: 'Show me all the deployment statuses.' },
-		{ role: 'assistant', content: [{ type: 'tool_use', id: 'tool_1', name: 'execute', input: {} }] },
-		{ role: 'tool', tool_call_id: 'tool_1', content: generateToolOutput('deployment_status', 1000) },
+		{
+			role: 'assistant',
+			content: [{ type: 'tool_use', id: 'tool_1', name: 'execute', input: {} }]
+		},
+		{
+			role: 'tool',
+			tool_call_id: 'tool_1',
+			content: generateToolOutput('deployment_status', 1000)
+		},
 		{ role: 'assistant', content: 'Here are all the deployment statuses.' }
 	];
 	try {
@@ -161,7 +182,9 @@ async function runBenchmark() {
 		console.log(`  Before: ${result.tokens_before} tokens`);
 		console.log(`  After:  ${result.tokens_after} tokens`);
 		console.log(`  Ratio:  ${(result.compression_ratio * 100).toFixed(1)}%`);
-		console.log(`  Saved:  ${(result.tokens_before - result.tokens_after).toLocaleString()} tokens`);
+		console.log(
+			`  Saved:  ${(result.tokens_before - result.tokens_after).toLocaleString()} tokens`
+		);
 	} catch (e) {
 		console.log(`  SKIP: Headroom unavailable (${e})`);
 	}

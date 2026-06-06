@@ -16,7 +16,9 @@ function freshDb(): void {
 	// on the next write). Truncating rows is what the tests actually want.
 	const db = new Database(DB_PATH);
 	try {
-		db.exec('DELETE FROM indexedContent; DELETE FROM compressedArtifact; DELETE FROM sessionEvent;');
+		db.exec(
+			'DELETE FROM indexedContent; DELETE FROM compressedArtifact; DELETE FROM sessionEvent;'
+		);
 	} catch {
 		// Tables don't exist yet on the very first run before api.ts has
 		// been loaded. That's fine — execute() will create them.

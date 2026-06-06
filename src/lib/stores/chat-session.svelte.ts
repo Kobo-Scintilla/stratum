@@ -56,37 +56,68 @@ export interface ChatSession {
 	readonly activeStreams: ActiveStream[];
 	readonly isSending: boolean;
 	readonly error: string;
-	switchSession(sessionId: string): void;
+	switchSession(sessionId: string, initialMessages?: ChatMessage[]): void;
+	loadMore(): void;
 	send(prompt: string): Promise<void>;
 	reset(): void;
 	destroy(): void;
 }
 
-export function createChatSession(initialSession?: string): ChatSession {
+let activeSession: ChatSession | null = null;
+
+export function getChatSession(
+	initialSession?: string,
+	initialMessages?: ChatMessage[]
+): ChatSession {
+	if (!browser) {
+		return createChatSession(initialSession, initialMessages);
+	}
+	if (!activeSession) {
+		activeSession = createChatSession(initialSession, initialMessages);
+	} else if (initialSession && activeSession.sessionId !== initialSession) {
+		activeSession.switchSession(initialSession, initialMessages);
+	}
+	return activeSession;
+}
+
+export function createChatSession(
+	initialSession?: string,
+	initialMessages?: ChatMessage[]
+): ChatSession {
 	let sessionId = $state<string | null>(initialSession ?? null);
-	let messages = $state<ChatMessage[]>([]);
+	let messages = $state<ChatMessage[]>(initialMessages ?? []);
 	let activeStreams = $state<ActiveStream[]>([]);
 	let isSending = $state(false);
 	let error = $state('');
+	let currentLimit = $state(50);
 
 	// Display messages derived from raw messages
 	let displayMessages = $derived(getDisplayMessages(messages));
 
-
 	let unsubs: (() => void)[] = [];
 
-	async function subscribe(sid: string) {
+	async function subscribe(sid: string, limitVal = 50) {
 		if (!sid) return;
+		currentLimit = limitVal;
 		for (const u of unsubs) u();
 		unsubs = [];
 
-		await AgentService.recoverMessages(sid).catch(() => {});
+		// Run in background without blocking subscription to prevent UI lag/flicker
+		AgentService.recoverMessages(sid).catch(() => {});
 
 		unsubs.push(
 			remult
 				.repo(ChatMessage)
-				.liveQuery({ where: { sessionId: sid }, orderBy: { sortOrder: 'asc' as const } })
-				.subscribe({ next: (info) => { messages = info.items; } })
+				.liveQuery({
+					where: { sessionId: sid },
+					orderBy: { sortOrder: 'desc' as const },
+					limit: limitVal
+				})
+				.subscribe({
+					next: (info) => {
+						messages = [...info.items].reverse();
+					}
+				})
 		);
 		unsubs.push(
 			remult
@@ -94,7 +125,14 @@ export function createChatSession(initialSession?: string): ChatSession {
 				.liveQuery({ where: { sessionId: sid }, orderBy: { createdAt: 'asc' as const } })
 				.subscribe({
 					next: (info) => {
-						console.log('[debug liveQuery] ActiveStream update, items:', info.items.length, 'text:', info.items[0]?.text?.slice(0, 50), 'segments:', info.items[0]?.segments?.length);
+						console.log(
+							'[debug liveQuery] ActiveStream update, items:',
+							info.items.length,
+							'text:',
+							info.items[0]?.text?.slice(0, 50),
+							'segments:',
+							info.items[0]?.segments?.length
+						);
 						activeStreams = info.items;
 					},
 					error: (err) => {
@@ -106,20 +144,43 @@ export function createChatSession(initialSession?: string): ChatSession {
 
 	if (browser && sessionId) {
 		const initSid = sessionId;
-		queueMicrotask(() => subscribe(initSid));
+		queueMicrotask(() => subscribe(initSid, currentLimit));
 	}
 
 	return {
-		get sessionId() { return sessionId; },
-		get messages() { return messages; },
-		get displayMessages() { return displayMessages; },
-		get activeStreams() { return activeStreams; },
-		get isSending() { return isSending; },
-		get error() { return error; },
+		get sessionId() {
+			return sessionId;
+		},
+		get messages() {
+			return messages;
+		},
+		get displayMessages() {
+			return displayMessages;
+		},
+		get activeStreams() {
+			return activeStreams;
+		},
+		get isSending() {
+			return isSending;
+		},
+		get error() {
+			return error;
+		},
 
-		switchSession(newId: string) {
+		switchSession(newId: string, initialMessages?: ChatMessage[]) {
+			if (sessionId === newId) return;
 			sessionId = newId;
-			subscribe(newId);
+			if (initialMessages) {
+				messages = initialMessages;
+			} else {
+				messages = [];
+			}
+			subscribe(newId, 50);
+		},
+
+		loadMore() {
+			if (!sessionId) return;
+			subscribe(sessionId, currentLimit + 50);
 		},
 
 		async send(prompt: string) {
@@ -127,7 +188,7 @@ export function createChatSession(initialSession?: string): ChatSession {
 			if (!sid) {
 				sid = crypto.randomUUID();
 				sessionId = sid;
-				await subscribe(sid);
+				await subscribe(sid, currentLimit);
 			}
 			isSending = true;
 			error = '';
@@ -148,6 +209,7 @@ export function createChatSession(initialSession?: string): ChatSession {
 			activeStreams = [];
 			isSending = false;
 			error = '';
+			currentLimit = 50;
 		},
 
 		destroy() {
