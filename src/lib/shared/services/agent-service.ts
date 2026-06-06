@@ -154,11 +154,15 @@ export class AgentService {
 		});
 		const historyMsgs = prevMessages
 			.filter((m) => m.role === 'user' || m.role === 'assistant')
-			.map((m) => ({
-				role: m.role as 'user' | 'assistant',
-				content: m.content,
-				timestamp: m.createdAt.getTime()
-			})) as import('@earendil-works/pi-agent-core').AgentMessage[];
+			.map((m) => {
+				const ts = m.createdAt.getTime();
+				if (m.role === 'user') {
+					// User messages pass through with string content
+					return { role: 'user' as const, content: m.content, timestamp: ts };
+				}
+				// Assistant messages need content as content-block array for pi-ai's transformMessages
+				return { role: 'assistant' as const, content: [{ type: 'text' as const, text: m.content }], timestamp: ts };
+			}) as import('@earendil-works/pi-agent-core').AgentMessage[];
 
 		try {
 			let lastFlushTime = Date.now();
@@ -174,9 +178,8 @@ export class AgentService {
 				'hasOpenCodeKey:',
 				!!process.env.OPENCODE_API_KEY
 			);
-
 			await runAgentLoop(
-				[...historyMsgs, userMessage],
+				[userMessage],
 				{
 					systemPrompt: '',
 					messages: historyMsgs,
@@ -344,7 +347,7 @@ export class AgentService {
 		await remult.repo(ChatMessage).deleteMany({ where: 'all' });
 	}
 
-	@BackendMethod({ allowed: true })
+	@BackendMethod({ allowed: true, transactional: false })
 	static async recoverMessages(sessionId: string): Promise<number> {
 		return await remult.repo(ChatMessage).count({ sessionId });
 	}
