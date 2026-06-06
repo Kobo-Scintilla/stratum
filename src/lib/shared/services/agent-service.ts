@@ -5,7 +5,7 @@ import { agentRegistry } from '../agents/registry';
 import { buildContext } from '../agents/context';
 import { runStreamLoop, insertUserMessage } from '../agents/stream';
 export class AgentService {
-	@BackendMethod({ allowed: true })
+	@BackendMethod({ allowed: true, transactional: false })
 	static async ask(prompt: string, sessionId: string = 'default'): Promise<string> {
 		const config = agentRegistry.get('assistant')!;
 		await insertUserMessage(sessionId, prompt);
@@ -31,7 +31,7 @@ export class AgentService {
 		return await remult.repo(ChatMessage).count({ sessionId });
 	}
 
-	@BackendMethod({ allowed: true })
+	@BackendMethod({ allowed: true, transactional: false })
 	static async listSessions() {
 		const msgs = await remult.repo(ChatMessage).find({
 			orderBy: { sessionId: 'asc', sortOrder: 'asc' }
