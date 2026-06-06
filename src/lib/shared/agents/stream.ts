@@ -203,11 +203,6 @@ export async function runStreamLoop(
 						content,
 						timestamp: Date.now()
 					} as any);
-
-					// Only save assistant to DB if there's actual text (skip tool-only turns to avoid UI duplication)
-					if (accumulatedText) {
-						await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
-					}
 					break;
 				}
 
@@ -253,8 +248,19 @@ export async function runStreamLoop(
 				await persistToolResult(sessionId, tc, Date.now());
 			}
 
-			// Reset accumulators for next turn (tool result text starts fresh)
+			// Save this turn's assistant message to DB now that streaming is done for this iteration
+			// (done handler only pushes to context.messages; DB save would trigger liveQuery overlap)
+			if (accumulatedText || toolCalls.length > 0) {
+				await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+			}
+
+			// Reset accumulators for next turn
 			accumulatedText = '';
 			toolCalls = [];
+		}
+
+		// Final turn: save if there was accumulated text (text-only response, no tool calls)
+		if (accumulatedText || toolCalls.length > 0) {
+			await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+		}
 	}
-}

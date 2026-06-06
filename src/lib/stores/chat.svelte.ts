@@ -54,6 +54,7 @@ export interface ChatSession {
 	readonly messages: ChatMessage[];
 	readonly displayMessages: EnrichedMessage[];
 	readonly activeStreams: ActiveStream[];
+	readonly visibleStreams: ActiveStream[];
 	readonly isSending: boolean;
 	readonly error: string;
 	switchSession(sessionId: string): void;
@@ -71,6 +72,16 @@ export function createChatSession(initialSession?: string): ChatSession {
 
 	// Display messages derived from raw messages
 	let displayMessages = $derived(getDisplayMessages(messages));
+
+	// Streams that don't yet have a matching assistant message (avoid dupes with ChatMessage liveQuery)
+	let visibleStreams = $derived(
+		activeStreams.filter((s) => {
+			const sTime = s.createdAt?.getTime?.() ?? 0;
+			return !messages.some(
+				(m) => m.role === 'assistant' && (m.createdAt?.getTime?.() ?? 0) >= sTime
+			);
+		})
+	);
 
 	let unsubs: (() => void)[] = [];
 
@@ -113,6 +124,7 @@ export function createChatSession(initialSession?: string): ChatSession {
 		get messages() { return messages; },
 		get displayMessages() { return displayMessages; },
 		get activeStreams() { return activeStreams; },
+		get visibleStreams() { return visibleStreams; },
 		get isSending() { return isSending; },
 		get error() { return error; },
 

@@ -59,7 +59,7 @@
 <div class="flex h-full flex-col">
 	<ScrollArea.Root class="flex-1 px-4" bind:viewportRef={viewport}>
 		<div class="mx-auto flex max-w-2xl flex-col gap-4 py-4">
-			{#if chat.displayMessages.length === 0 && chat.activeStreams.length === 0 && !chat.isSending}
+			{#if chat.displayMessages.length === 0 && chat.visibleStreams.length === 0 && !chat.isSending}
 				<EmptyState />
 			{/if}
 
@@ -77,7 +77,7 @@
 				{/if}
 			{/each}
 
-			{#each chat.activeStreams as stream (stream.id)}
+			{#each chat.visibleStreams as stream (stream.id)}
 				<ChatStream {stream} />
 			{/each}
 
