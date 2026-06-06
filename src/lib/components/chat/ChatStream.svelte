@@ -12,9 +12,13 @@
 	let { stream }: {
 		stream: { id: string; text: string; segments?: Segment[]; toolCalls?: Array<{ id: string; name: string; args: unknown; result?: unknown; isError?: boolean }> };
 	} = $props();
+
+	let displaySegments = $derived<Segment[]>(
+		stream.segments?.length ? stream.segments : stream.text ? [{ type: 'text', text: stream.text }] : []
+	);
 </script>
 
-{#each stream.segments?.length ? stream.segments : (stream.text ? [{ type: 'text' as const, text: stream.text }] : []) as seg, i (i)}
+{#each displaySegments as seg, i (i)}
 	<div class="flex gap-3">
 		{#if seg.type === 'text'}
 			<!-- Text segment: show avatar only on first segment or if standalone -->
