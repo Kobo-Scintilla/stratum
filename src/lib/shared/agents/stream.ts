@@ -215,16 +215,6 @@ export async function runStreamLoop(
 			// ── After stream ends, check for pending tool calls ──
 			const pendingToolCalls = toolCalls.filter((t) => t.result === undefined);
 
-			// DEBUG: log context before second iteration
-			if (context.messages.length > 0) {
-				const lastFew = context.messages.slice(-4).map((m: any) => ({
-					role: m.role,
-					hasToolCalls: m.content?.some?.((c: any) => c.type === 'toolCall') ?? false,
-					hasToolCallId: !!m.toolCallId,
-					contentKind: Array.isArray(m.content) ? m.content.map((c: any) => c.type) : typeof m.content
-				}));
-				console.log('[debug context]', JSON.stringify(lastFew, null, 2));
-			}
 
 			if (pendingToolCalls.length === 0) break;
 
