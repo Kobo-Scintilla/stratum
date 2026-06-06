@@ -84,9 +84,13 @@ export async function insertUserMessage(
 export async function runStreamLoop(
 	config: AgentConfig,
 	context: Context,
-	sessionId: string
+	sessionId: string,
+	streamId: string
 ): Promise<void> {
 	const model = getModel(config.modelProvider as never, config.modelId as never);
+
+	const stream = await remult.repo(ActiveStream).findId(streamId);
+	if (!stream) throw new Error(`ActiveStream ${streamId} not found`);
 
 	let accumulatedText = '';
 	let lastWasTool = false;
@@ -94,11 +98,6 @@ export async function runStreamLoop(
 	let segments: ActiveStream['segments'] = [];
 
 	while (true) {
-		// Each iteration gets its own ActiveStream so ChatMessage saves on previous
-		// iteration don't overlap with the next iteration's streaming UI.
-		const stream = await insertActiveStream(sessionId, '');
-		if (!stream) continue;
-
 		const eventStream = streamSimple(model, context);
 
 		for await (const event of eventStream) {
@@ -177,7 +176,6 @@ export async function runStreamLoop(
 				}
 
 				case 'done': {
-					// Push assistant message to context so tool results have a preceding assistant with tool_calls
 					const content: ({ type: 'text'; text: string } | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> })[] = [];
 					if (accumulatedText) content.push({ type: 'text', text: accumulatedText });
 					for (const tc of toolCalls) {
@@ -203,18 +201,12 @@ export async function runStreamLoop(
 			}
 		}
 
-		// ── After stream ends, check for pending tool calls ──
-		const pendingToolCalls = toolCalls.filter((t) => t.result === undefined);
-
-		// Save assistant message (with toolCalls) to DB BEFORE executing tools,
-		// so sort order is: assistant[toolCalls] → toolResult → assistant[text]
+		// ── Save assistant message to DB for history ──
 		if (accumulatedText || toolCalls.length > 0) {
 			await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
 		}
 
-		// Delete this iteration's stream now that its content is saved as ChatMessage
-		await remult.repo(ActiveStream).delete(stream.id).catch(() => {});
-
+		const pendingToolCalls = toolCalls.filter((t) => t.result === undefined);
 		if (pendingToolCalls.length === 0) break;
 
 		// Execute tools and add results to context for next iteration
@@ -226,14 +218,12 @@ export async function runStreamLoop(
 			tc.result = result;
 			tc.isError = isError;
 
-			// Update segment with result
 			const seg = segments.find((s) => s.type === 'tool' && s.toolCallId === tc.id);
 			if (seg && seg.type === 'tool') {
 				seg.result = result;
 				seg.isError = isError;
 			}
 
-			// Add tool result to the LLM context for continuation
 			context.messages.push({
 				role: 'toolResult' as const,
 				toolCallId: tc.id,
@@ -243,7 +233,6 @@ export async function runStreamLoop(
 				timestamp: Date.now()
 			} as unknown as Message);
 
-			// Persist tool result message
 			await persistToolResult(sessionId, tc, Date.now());
 		}
 

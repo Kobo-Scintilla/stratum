@@ -3,18 +3,23 @@ import { ActiveStream } from '../entities/active-stream';
 import { ChatMessage } from '../entities/chat-message';
 import { agentRegistry } from '../agents/registry';
 import { buildContext } from '../agents/context';
-import { runStreamLoop, insertUserMessage } from '../agents/stream';
+import { runStreamLoop, insertActiveStream, insertUserMessage } from '../agents/stream';
 export class AgentService {
 	@BackendMethod({ allowed: true, transactional: false })
 	static async ask(prompt: string, sessionId: string = 'default'): Promise<string> {
 		const config = agentRegistry.get('assistant')!;
 		await insertUserMessage(sessionId, prompt);
+		const activeStream = await insertActiveStream(sessionId, prompt);
 		const context = await buildContext(sessionId, config, prompt);
 
 		try {
-			await runStreamLoop(config, context, sessionId);
+			await runStreamLoop(config, context, sessionId, activeStream.id);
 		} catch (err) {
 			console.error('[ask] stream error:', err);
+		} finally {
+			setTimeout(() => {
+				remult.repo(ActiveStream).delete(activeStream.id).catch(() => {});
+			}, 800);
 		}
 
 		return sessionId;
