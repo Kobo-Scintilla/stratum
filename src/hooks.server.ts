@@ -1,14 +1,10 @@
-import type { Handle } from '@sveltejs/kit';
-import { getHarness } from '$lib/server/engine';
-import '$lib/server/flue';
+import { sequence } from '@sveltejs/kit/hooks';
+import { env } from '$env/dynamic/private';
+import { api as handleRemult } from '$lib/server/api';
 
-try {
-	await getHarness();
-} catch (err) {
-	console.error('[Flue] Failed to initialize runtime:', err);
-	process.exit(1);
-}
+// pi-ai reads API keys from process.env via getEnvApiKey().
+// SvelteKit doesn't expose .env vars on process.env directly,
+// so proxy them here from $env/dynamic/private.
+process.env.OPENCODE_API_KEY = env.OPENCODE_API_KEY;
 
-export const handle: Handle = async ({ event, resolve }) => {
-  return resolve(event);
-};
+export const handle = sequence(handleRemult);

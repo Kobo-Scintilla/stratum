@@ -139,39 +139,43 @@ Browser (SvelteKit frontend)
   │
   ▼ load() / form actions / fetch
 SvelteKit server
-  ├── hooks.server.ts  ──  Init Flue runtime on startup
+  ├── hooks.server.ts  ──  Env proxy ($env/dynamic/private → process.env), Remult handler
   ├── api/[...remult]  ──  Remult CRUD REST (entities + controllers)
   │
   ├── $lib/server/
-  │   ├── engine.ts    ──  Flue runtime init, bifrost provider registration
-  │   ├── flue.ts      ──  Flue bridge (globalThis.flue), AsyncQueue SSE
-  │   ├── api.ts       ──  Remult API setup (SQLite, entities, admin UI)
-  │   └── agents/
-  │       └── assistant.ts  ──  Flue agent definition (model, sandbox)
+  │   └── api.ts       ──  Remult API setup (SQLite, entities, admin UI)
   │
   ├── $lib/shared/
-  │   ├── types.ts          ──  Agent event types, FlueBridge interface
-  │   ├── AgentService.ts   ──  Remult controller: ask(), recoverMessages()
-  │   ├── chat.svelte.ts    ──  Svelte 5 runes chat session (liveQuery)
-  │   ├── FlueSessionStore  ──  Session persistence adapter
-  │   └── entities/         ──  Remult entities (ChatMessage, ActiveStream, FlueSession)
+  │   ├── types.ts          ──  Agent event types
+  │   ├── services/
+  │   │   └── agent-service.ts  ──  Remult controller: ask(), recoverMessages()
+  │   ├── stores/
+  │   │   ├── chat.svelte.ts    ──  Chat session state (createChatSession)
+  │   │   └── create-query.svelte.ts  ──  createQuery rune helper
+  │   ├── entities/
+  │   │   ├── active-stream.ts  ──  ActiveStream entity
+  │   │   └── chat-message.ts   ──  ChatMessage entity
+  │   └── components/
+  │       ├── chat/             ──  Chat UI components (ChatInput, ChatStream, ...)
+  │       └── sidebar-*.svelte  ──  Sidebar components
   │
   └── routes/
       ├── +layout.svelte    ──  Root layout, nav state init
       ├── dashboard/        ──  Dashboard layout (sidebar + content)
       └── api/[...remult]   ──  Remult REST endpoint catch-all
 
-tools-archive/   ──  Custom Flue tools (execute, compress, search, handoff)
+tools-archive/   ──  Flue agent tools (execute, compress, search, handoff)
 
 SQLite (db.sqlite)
-  ├── chatMessages, activeStreams, flueSessions  ──  Remult-managed tables
-  ├── indexedContent, compressedArtifact, sessionEvent  ──  Knowledge store
-  └── chunks_fts (FTS5)     ──  Full-text search virtual table
+  └── chatMessages, activeStreams  ──  Remult-managed tables
+      indexedContent, compressedArtifact  ──  Knowledge store
+      chunks_fts (FTS5)     ──  Full-text search virtual table
 ```
 
-**Data flow**: User sends message → `AgentService.ask()` → `flue.agents.invoke()` → Flue runtime processes agent → events emitted via AsyncQueue → stored to SQLite via Remult → live queries update UI.
+**Data flow**: User sends message → `AgentService.ask()` → pi-ai `runAgentLoop` → LLM streaming → events update `ActiveStream` in DB → live queries push to UI.
 
-**Two SQLite handles**: `api.ts` owns the primary connection (Remult entities); `execute.ts`/`search.ts` open a second for FTS5 MATCH queries (not exposed through Remult).
+**Two SQLite handles**: `api.ts` owns the primary connection (Remult entities); `execute.ts`/`search.ts` open a second for FTS5 MATCH queries.
+
 
 ## Key Directories
 
@@ -299,29 +303,43 @@ Each tool:
 2. Lazy-imports `api.ts` via `ensureRemult()` when `globalThis.remultApi` is absent
 3. Wraps Remult ops in `runInRemultContext(fn)`
 4. Barrel-exported from `tools-archive/index.ts`
-
 ## Important Files
 
 | File | Purpose |
 |---|---|
 | `svelte.config.js` | SvelteKit config (Node adapter, runes mode forced) |
-| `vite.config.ts` | Vite config (Tailwind CSS v4 plugin, SSR noExternal for lucide) |
+| `vite.config.ts` | Vite config (Tailwind CSS v4 plugin, SSR noExternal for hugeicons) |
 | `tsconfig.json` | TS strict mode, experimentalDecorators, extends `.svelte-kit/tsconfig.json` |
-| `components.json` | shadcn-svelte config (maia style, remixicon, taupe base) |
 | `.prettierrc` | Prettier: tabs, single quotes, no trailing commas, 100 width |
-| `.fallowrc.jsonc` | Fallow linter config (cyclomatic ≤20, cognitive ≤15, gate: new-only) |
-| `pnpm-workspace.yaml` | pnpm allowBuilds for native modules (better-sqlite3, etc.) |
-| `src/app.html` | SvelteKit shell HTML |
-| `src/hooks.server.ts` | Server init hook: starts Flue runtime, all requests pass through |
-| `src/lib/server/engine.ts` | Flue runtime bootstrap, bifrost LLM provider registration |
-| `src/lib/server/flue.ts` | Flue bridge object with AsyncQueue for SSE streaming |
+| `src/hooks.server.ts` | Server init: proxies `OPENCODE_API_KEY` from `$env/dynamic/private` → `process.env` for pi-ai; wires Remult handler |
 | `src/lib/server/api.ts` | Remult API: SQLite connection, entity registration, admin UI |
-| `src/lib/server/agents/assistant.ts` | Agent config (model, sandbox) |
-| `src/lib/shared/AgentService.ts` | Main service: ask(), recoverMessages(), liveQuery subscription |
-| `src/lib/shared/chat.svelte.ts` | Svelte 5 runes chat session (createChatSession) |
-| `src/routes/api/[...remult]/+server.ts` | Remult REST endpoint (catch-all route) |
-| `tools-archive/index.ts` | Tool barrel export, allTools array for agent registration |
-| `.gitignore` | Standard SvelteKit ignore + `.fallow/` |
+| `src/lib/shared/services/agent-service.ts` | Main Remult controller: `ask()`, `recoverMessages()`, `listSessions()` — uses pi-ai directly |
+| `src/lib/shared/entities/active-stream.ts` | ActiveStream entity (streaming state during agent turns) |
+| `src/lib/shared/entities/chat-message.ts` | ChatMessage entity (persisted messages) |
+| `src/lib/shared/types.ts` | Agent event types (`text_delta`, `tool_call`, `error`, etc.) |
+| `src/lib/stores/chat.svelte.ts` | Svelte 5 runes chat session (createChatSession) |
+| `tools-archive/` | Flue agent tools (execute, compress, search/index, handoff) |
+| `.env` | **Not checked in**. Contains `OPENCODE_API_KEY` for pi-ai provider |
+
+## API Key Proxy Pattern (Env Var Bridge)
+
+pi-ai reads API keys from `process.env` via `getEnvApiKey()`. SvelteKit doesn't expose `.env` variables on `process.env` directly — they're only accessible through `$env/static/private` or `$env/dynamic/private` modules, which can only be imported from server-only modules (`.server.ts` / `$lib/server/`).
+
+Since `agent-service.ts` lives in `$lib/shared/services/` (imported by both server and client code), it cannot import private env vars directly. The bridge:
+
+```ts
+// src/hooks.server.ts — runs at module load time, before any request
+import { env } from '$env/dynamic/private';
+process.env.OPENCODE_API_KEY = env.OPENCODE_API_KEY;
+```
+
+This sets `process.env.OPENCODE_API_KEY` once at server startup. pi-ai's `streamSimple()` → `withEnvApiKey()` → `getEnvApiKey('opencode-go')` then finds it.
+
+**Alternative approaches considered** (rejected for this app):
+- **SQLite storage**: No security benefit without encryption; need master key somewhere (same bootstrap problem)
+- **OS keychain**: Overkill for local dev dashboard; adds platform-specific deps
+- **Remult context**: `remult.context` only exposes request headers, not env vars
+- **Move to `$lib/server/`**: Breaks client imports (`sidebar-session-list.svelte`, `chat.svelte.ts` import `AgentService`)
 
 ## Runtime / Tooling Preferences
 
