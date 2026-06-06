@@ -18,11 +18,9 @@ export class AgentService {
 			console.error('[ask] stream error:', err);
 		} finally {
 			const sid = activeStream.id;
-			setTimeout(() => {
-				globalThis.remultApi?.withRemult(undefined, async () => {
-					await remult.repo(ActiveStream).delete(sid);
-				}).catch(() => {});
-			}, 800);
+			globalThis.remultApi?.withRemult(undefined, async () => {
+				await remult.repo(ActiveStream).delete(sid);
+			}).catch(() => {});
 		}
 
 		return activeStream.id;
