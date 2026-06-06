@@ -186,12 +186,29 @@ export async function runStreamLoop(
 						break;
 					}
 
-					case 'done': {
-						if (accumulatedText || toolCalls.length > 0) {
-							await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
-						}
-						break;
+			case 'done': {
+				if (accumulatedText || toolCalls.length > 0) {
+					await insertAssistantMessage(sessionId, accumulatedText, toolCalls, Date.now());
+
+					// Push assistant message to context so tool results have a preceding assistant with tool_calls
+					const content: ({ type: 'text'; text: string } | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> })[] = [];
+					if (accumulatedText) content.push({ type: 'text', text: accumulatedText });
+					for (const tc of toolCalls) {
+						content.push({
+							type: 'toolCall',
+							id: tc.id,
+							name: tc.name,
+							arguments: tc.args as Record<string, unknown>
+						});
 					}
+					context.messages.push({
+						role: 'assistant',
+						content,
+						timestamp: Date.now()
+					} as any);
+				}
+				break;
+			}
 
 					case 'error': {
 						console.error('[stream] stream error:', event.error);
