@@ -107,9 +107,11 @@ export async function runStreamLoop(
 		return await remult.repo(ActiveStream).findId(streamId);
 	});
 	if (!stream) throw new Error(`ActiveStream ${streamId} not found`);
-
+let _iter = 0;
 	while (true) {
-			const eventStream = streamSimple(model, context);
+		_iter++;
+		console.log('[iter]', _iter, 'msgs:', context.messages.length, 'text:', JSON.stringify(accumulatedText).slice(0, 50));
+		const eventStream = streamSimple(model, context);
 
 			for await (const event of eventStream) {
 				switch (event.type) {
@@ -185,8 +187,8 @@ export async function runStreamLoop(
 						await updateActiveStream(stream, accumulatedText, toolCalls, segments);
 						break;
 					}
-
 				case 'done': {
+					console.log('[debug done] iter:', _iter, 'accText:', JSON.stringify(accumulatedText).slice(0, 80), 'toolCalls:', toolCalls.length);
 					// Push assistant message to context so tool results have a preceding assistant with tool_calls
 					const content: ({ type: 'text'; text: string } | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> })[] = [];
 					if (accumulatedText) content.push({ type: 'text', text: accumulatedText });
