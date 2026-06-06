@@ -7,29 +7,42 @@ function genId(): string {
 	return crypto.randomUUID();
 }
 
+/** Run code in its own Remult context so changes commit immediately
+ *  and are visible to the liveQuery publisher (which runs outside our
+ *  BackendMethod's transaction). */
+async function withOwnContext<T>(fn: () => Promise<T>): Promise<T> {
+	if (globalThis.remultApi) {
+		return await (globalThis.remultApi.withRemult as (ctx: undefined, fn: () => Promise<T>) => Promise<T>)(undefined, fn);
+	}
+	return await fn();
+}
+
 async function insertUserMessage(sessionId: string, content: string) {
-	await remult.repo(ChatMessage).insert({
-		id: genId(),
-		sessionId,
-		role: 'user',
-		content,
-		sortOrder: Date.now(),
-		createdAt: new Date()
+	await withOwnContext(async () => {
+		await remult.repo(ChatMessage).insert({
+			id: genId(),
+			sessionId,
+			role: 'user',
+			content,
+			sortOrder: Date.now(),
+			createdAt: new Date()
+		});
 	});
 }
 
 async function insertActiveStream(sessionId: string, prompt: string): Promise<ActiveStream> {
-	return await remult.repo(ActiveStream).insert({
-		id: genId(),
-		sessionId,
-		prompt,
-		text: '',
-		isGenerating: true,
-		createdAt: new Date(),
-		toolCalls: []
+	return await withOwnContext(async () => {
+		return await remult.repo(ActiveStream).insert({
+			id: genId(),
+			sessionId,
+			prompt,
+			text: '',
+			isGenerating: true,
+			createdAt: new Date(),
+			toolCalls: []
+		});
 	});
 }
-
 async function updateActiveStream(
 	stream: ActiveStream,
 	text: string,
@@ -37,11 +50,13 @@ async function updateActiveStream(
 	segments: ActiveStream['segments']
 ) {
 	console.log('[debug updateActiveStream] saving, text len:', text.length, 'segments:', segments.length, 'segments JSON:', JSON.stringify(segments.slice(0, 2)).slice(0, 200));
-	await remult.repo(ActiveStream).save({
-		...stream,
-		text,
-		toolCalls: toolCalls.map((t) => ({ ...t })),
-		segments
+	await withOwnContext(async () => {
+		await remult.repo(ActiveStream).save({
+			...stream,
+			text,
+			toolCalls: toolCalls.map((t) => ({ ...t })),
+			segments
+		});
 	});
 }
 
@@ -51,18 +66,16 @@ async function insertAssistantMessage(
 	toolCalls: Array<{ id: string; name: string; args: unknown }>,
 	sortOrder: number
 ) {
-	if (!text && toolCalls.length === 0) return;
-	await remult.repo(ChatMessage).insert({
-		id: genId(),
-		sessionId,
-		role: 'assistant',
-		content: text,
-		toolCalls:
-			toolCalls.length > 0
-				? toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args }))
-				: undefined,
-		sortOrder,
-		createdAt: new Date(sortOrder)
+	await withOwnContext(async () => {
+		await remult.repo(ChatMessage).insert({
+			id: genId(),
+			sessionId,
+			role: 'assistant',
+			content: text,
+			toolCalls: toolCalls.length > 0 ? toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args })) : undefined,
+			sortOrder,
+			createdAt: new Date(sortOrder)
+		});
 	});
 }
 
