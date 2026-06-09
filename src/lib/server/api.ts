@@ -19,6 +19,13 @@ db.exec(`
 	CREATE INDEX IF NOT EXISTS idx_activeStreams_sessionId ON activeStreams(sessionId);
 `);
 
+// Migrations
+try {
+	db.exec(`ALTER TABLE providerSettings ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1`);
+} catch {
+	// Column already exists
+}
+
 const dataProvider = new SqlDatabase(new BetterSqlite3DataProvider(db));
 
 export const api = remultApi({

@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
@@ -324,7 +324,7 @@ Each tool:
 | `vite.config.ts`                           | Vite config (Tailwind CSS v4 plugin, SSR noExternal for hugeicons)                                                  |
 | `tsconfig.json`                            | TS strict mode, experimentalDecorators, extends `.svelte-kit/tsconfig.json`                                         |
 | `.prettierrc`                              | Prettier: tabs, single quotes, no trailing commas, 100 width                                                        |
-| `src/hooks.server.ts`                      | Server init: proxies `OPENCODE_API_KEY` from `$env/dynamic/private` → `process.env` for pi-ai; wires Remult handler |
+| `src/hooks.server.ts`                      | Server init: bootstraps encryption key, wires Remult handler                                                        |
 | `src/lib/server/api.ts`                    | Remult API: SQLite connection, entity registration, admin UI                                                        |
 | `src/lib/shared/services/agent-service.ts` | Main Remult controller: `ask()`, `recoverMessages()`, `listSessions()` — uses pi-ai directly                        |
 | `src/lib/shared/entities/active-stream.ts` | ActiveStream entity (streaming state during agent turns)                                                            |
@@ -332,28 +332,12 @@ Each tool:
 | `src/lib/shared/types.ts`                  | Agent event types (`text_delta`, `tool_call`, `error`, etc.)                                                        |
 | `src/lib/stores/chat.svelte.ts`            | Svelte 5 runes chat session (createChatSession)                                                                     |
 | `tools-archive/`                           | Flue agent tools (execute, compress, search/index, handoff)                                                         |
-| `.env`                                     | **Not checked in**. Contains `OPENCODE_API_KEY` for pi-ai provider                                                  |
 
-## API Key Proxy Pattern (Env Var Bridge)
+## API Key Management (Sidebar Providers)
 
-pi-ai reads API keys from `process.env` via `getEnvApiKey()`. SvelteKit doesn't expose `.env` variables on `process.env` directly — they're only accessible through `$env/static/private` or `$env/dynamic/private` modules, which can only be imported from server-only modules (`.server.ts` / `$lib/server/`).
+API keys are managed through the sidebar Providers UI — stored encrypted in SQLite via `ProviderSetting` entity, never in `.env` or hardcoded.
 
-Since `agent-service.ts` lives in `$lib/shared/services/` (imported by both server and client code), it cannot import private env vars directly. The bridge:
-
-```ts
-// src/hooks.server.ts — runs at module load time, before any request
-import { env } from '$env/dynamic/private';
-process.env.OPENCODE_API_KEY = env.OPENCODE_API_KEY;
-```
-
-This sets `process.env.OPENCODE_API_KEY` once at server startup. pi-ai's `streamSimple()` → `withEnvApiKey()` → `getEnvApiKey('opencode-go')` then finds it.
-
-**Alternative approaches considered** (rejected for this app):
-
-- **SQLite storage**: No security benefit without encryption; need master key somewhere (same bootstrap problem)
-- **OS keychain**: Overkill for local dev dashboard; adds platform-specific deps
-- **Remult context**: `remult.context` only exposes request headers, not env vars
-- **Move to `$lib/server/`**: Breaks client imports (`sidebar-session-list.svelte`, `chat.svelte.ts` import `AgentService`)
+On each `ask()` request, `agent-service.ts` reads all configured providers from DB, decrypts their keys, and sets `process.env` for pi-ai to pick up via `getEnvApiKey()`. This way keys are managed at runtime through the UI, not at deploy time.
 
 ## Runtime / Tooling Preferences
 

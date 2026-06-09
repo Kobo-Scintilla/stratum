@@ -10,6 +10,9 @@ export class ProviderSetting {
 	@Fields.string()
 	apiKey = ''; // encrypted value
 
+	@Fields.boolean()
+	enabled = true;
+
 	@Fields.string({ allowNull: true })
 	baseUrl?: string; // for custom providers
 

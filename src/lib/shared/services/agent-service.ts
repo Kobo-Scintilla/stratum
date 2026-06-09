@@ -23,15 +23,31 @@ async function getEncryption() {
 export class AgentService {
 	@BackendMethod({ allowed: true, transactional: false })
 	static async ask(prompt: string, sessionId: string = 'default'): Promise<string> {
-		// 1. Populate process.env with configured provider API keys
-		const providerSettings = await remult.repo(ProviderSetting).find();
+		// 1. Fetch session settings first
+		const sessionSettings = await remult.repo(ChatSessionSettings).findId(sessionId);
+		const baseConfig = agentRegistry.get('assistant')!;
+		const config = {
+			...baseConfig,
+			modelProvider: sessionSettings?.modelProvider ?? baseConfig.modelProvider,
+			modelId: sessionSettings?.modelId ?? baseConfig.modelId,
+			contextWindow: sessionSettings?.contextWindow ?? 20
+		};
+
+		// 2. Validate provider is selected
+		if (!config.modelProvider || !config.modelId) {
+			throw new Error('No model selected. Open the sidebar, configure a provider with an API key, then select a model.');
+		}
+
+		// 3. Populate process.env with configured provider API keys
+		const providerSettings = await remult.repo(ProviderSetting).find({ where: { enabled: true } });
 		const { findEnvKeys } = await import('@earendil-works/pi-ai');
 		const enc = await getEncryption();
+		let configuredCount = 0;
 		for (const setting of providerSettings) {
 			if (setting.apiKey) {
 				const decrypted = enc.decrypt(setting.apiKey);
+				configuredCount++;
 				if (setting.baseUrl) {
-					// Custom provider — map API key to env var based on API type
 					const apiKeyEnv =
 						setting.apiType === 'anthropic-messages' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
 					process.env[apiKeyEnv] = decrypted;
@@ -44,15 +60,16 @@ export class AgentService {
 			}
 		}
 
-		// 2. Fetch session settings or fall back to defaults
-		const sessionSettings = await remult.repo(ChatSessionSettings).findId(sessionId);
-		const baseConfig = agentRegistry.get('assistant')!;
-		const config = {
-			...baseConfig,
-			modelProvider: sessionSettings?.modelProvider ?? baseConfig.modelProvider,
-			modelId: sessionSettings?.modelId ?? baseConfig.modelId,
-			contextWindow: sessionSettings?.contextWindow ?? 20
-		};
+		// 4. Validate the selected provider has an API key
+		const selectedSetting = providerSettings.find((s) => s.id === config.modelProvider);
+		if (!selectedSetting?.apiKey) {
+			if (configuredCount === 0) {
+				throw new Error('No API keys configured. Open the sidebar, add a provider, and enter your API key.');
+			}
+			throw new Error(
+				`Provider "${config.modelProvider}" has no API key configured. Add its key in the sidebar providers.`
+			);
+		}
 
 		await insertUserMessage(sessionId, prompt);
 		const activeStream = await insertActiveStream(sessionId, prompt);
@@ -128,10 +145,17 @@ export class AgentService {
 	static async saveProviderKey(providerId: string, apiKey: string): Promise<void> {
 		const enc = await getEncryption();
 		const encrypted = apiKey ? enc.encrypt(apiKey) : '';
-		await remult.repo(ProviderSetting).save({
-			id: providerId,
-			apiKey: encrypted
-		});
+		const existing = await remult.repo(ProviderSetting).findId(providerId);
+		if (existing) {
+			existing.apiKey = encrypted;
+			await remult.repo(ProviderSetting).save(existing);
+		} else {
+			await remult.repo(ProviderSetting).insert({
+				id: providerId,
+				apiKey: encrypted,
+				enabled: true
+			});
+		}
 	}
 
 	@BackendMethod({ allowed: true, transactional: false })
@@ -156,6 +180,39 @@ export class AgentService {
 	@BackendMethod({ allowed: true })
 	static async deleteProviderKey(providerId: string): Promise<void> {
 		await remult.repo(ProviderSetting).delete(providerId);
+	}
+
+	@BackendMethod({ allowed: true, transactional: false })
+	static async getConfiguredProviders(): Promise<
+		Array<{ id: string; enabled: boolean; hasKey: boolean; baseUrl?: string; apiType?: string; models?: string }>
+	> {
+		const settings = await remult.repo(ProviderSetting).find();
+		return settings.map((s) => ({
+			id: s.id,
+			enabled: s.enabled,
+			hasKey: !!s.apiKey,
+			baseUrl: s.baseUrl,
+			apiType: s.apiType,
+			models: s.models
+		}));
+	}
+
+	@BackendMethod({ allowed: true })
+	static async addProvider(providerId: string): Promise<void> {
+		await remult.repo(ProviderSetting).save({
+			id: providerId,
+			apiKey: '',
+			enabled: true
+		});
+	}
+
+	@BackendMethod({ allowed: true })
+	static async toggleProvider(providerId: string, enabled: boolean): Promise<void> {
+		const setting = await remult.repo(ProviderSetting).findId(providerId);
+		if (setting) {
+			setting.enabled = enabled;
+			await remult.repo(ProviderSetting).save(setting);
+		}
 	}
 
 	@BackendMethod({ allowed: true })

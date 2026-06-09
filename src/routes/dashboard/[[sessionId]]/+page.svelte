@@ -18,19 +18,22 @@
 	import ToolCall from '$lib/components/chat/ToolCall.svelte';
 
 	let providerInfo = $state<Array<{ id: string; models: string[] }>>([]);
-	let configuredProviders = $state<Set<string>>(new Set());
+	let enabledProviders = $state<Set<string>>(new Set());
 	let sessionSettings = $state<ChatSessionSettings | null>(null);
 	let modelSwitcherOpen = $state(false);
+let pendingModel = $state<{ provider: string; model: string } | null>(null);
 
 	onMount(async () => {
-		const [providers, keys] = await Promise.all([
+		const [providers, configured] = await Promise.all([
 			AgentService.getProvidersInfo(),
-			AgentService.getProviderApiKeys()
+			AgentService.getConfiguredProviders()
 		]);
 		providerInfo = providers;
-		// Only show providers that have API keys configured
-		const configured = new Set(Object.keys(keys));
-		configuredProviders = configured;
+		// Only show providers that are enabled AND have API keys
+		const enabled = new Set(
+			configured.filter((c) => c.enabled && c.hasKey).map((c) => c.id)
+		);
+		enabledProviders = enabled;
 	});
 	let sessionId = $derived($page.params.sessionId);
 	// svelte-ignore state_referenced_locally
@@ -66,8 +69,8 @@
 						try {
 							sessionSettings = await remult.repo(ChatSessionSettings).insert({
 								id: sessionId,
-								modelProvider: 'opencode-go',
-								modelId: 'deepseek-v4-flash',
+								modelProvider: '',
+								modelId: '',
 								contextWindow: 20
 							});
 						} catch (e) {
@@ -87,9 +90,22 @@
 			...fields
 		});
 	}
-
-	function handleSend(text: string) {
+	async function handleSend(text: string) {
 		const wasNull = !chat.sessionId;
+		const model = pendingModel;
+
+		if (wasNull && model) {
+			const sid = crypto.randomUUID();
+			await remult.repo(ChatSessionSettings).insert({
+				id: sid,
+				modelProvider: model.provider,
+				modelId: model.model,
+				contextWindow: 20
+			});
+			pendingModel = null;
+			await chat.switchSession(sid);
+		}
+
 		chat.send(text);
 		if (wasNull && chat.sessionId && browser) {
 			goto(`/dashboard/${chat.sessionId}`, { replaceState: true, noScroll: true, keepFocus: true });
@@ -131,10 +147,9 @@
 		}
 	});
 
-	// Model groups — only configured providers
 	const modelGroups = $derived(
 		providerInfo
-			.filter((p) => configuredProviders.has(p.id))
+			.filter((p) => enabledProviders.has(p.id))
 			.map((p) => ({
 				provider: p.id,
 				models: p.models.map((m) => ({
@@ -144,19 +159,37 @@
 				}))
 			}))
 	);
+	const hasActiveProviders = $derived(enabledProviders.size > 0);
+	const modelReady = $derived(
+		!!pendingModel || (
+			!!sessionSettings?.modelProvider && !!sessionSettings?.modelId && enabledProviders.has(sessionSettings.modelProvider)
+		)
+	);
 
 	const currentModelLabel = $derived(
-		sessionSettings ? `${sessionSettings.modelProvider}/${sessionSettings.modelId}` : 'Select model'
+		pendingModel
+			? `${pendingModel.provider}/${pendingModel.model}`
+			: sessionSettings?.modelProvider && sessionSettings?.modelId
+				? `${sessionSettings.modelProvider}/${sessionSettings.modelId}`
+				: 'Select a model'
 	);
 
 	const activeValue = $derived(
-		sessionSettings ? `${sessionSettings.modelProvider}/${sessionSettings.modelId}` : ''
+		pendingModel
+			? `${pendingModel.provider}/${pendingModel.model}`
+			: sessionSettings?.modelProvider && sessionSettings?.modelId
+				? `${sessionSettings.modelProvider}/${sessionSettings.modelId}`
+				: ''
 	);
 	function onModelSelect(value: string) {
 		const [provider, ...rest] = value.split('/');
 		const model = rest.join('/');
 		if (provider && model) {
-			updateSettings({ modelProvider: provider, modelId: model });
+			if (sessionId && sessionSettings) {
+				updateSettings({ modelProvider: provider, modelId: model });
+			} else {
+				pendingModel = { provider, model };
+			}
 		}
 		modelSwitcherOpen = false;
 	}
@@ -195,15 +228,15 @@
 
 	<!-- Chat Input + Model Switcher -->
 	<div class="sticky bottom-0 border-t border-border/25 bg-background">
-		<ChatInput disabled={chat.isSending} error={chat.error} onsend={handleSend} />
+		<ChatInput disabled={chat.isSending || !modelReady} error={!hasActiveProviders ? 'Configure a provider with an API key in the sidebar to start.' : !modelReady ? 'Select a model above to start.' : chat.error} onsend={handleSend} />
 
-		{#if sessionId && sessionSettings}
+		{#if sessionId}
 			<div class="mx-auto flex max-w-2xl items-center justify-end px-4 pb-2 pt-1">
 				<Popover.Root bind:open={modelSwitcherOpen}>
 					<Popover.Trigger>
 						<button
 							type="button"
-							class="flex items-center gap-1.5 rounded-full border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+							class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
 						>
 							<span>{currentModelLabel}</span>
 							<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -215,7 +248,7 @@
 						<Command.Root value={activeValue}>
 							<Command.Input placeholder="Search models..." />
 							<Command.List class="max-h-[min(60vh,28rem)]">
-								<Command.Empty>No model found.</Command.Empty>
+								<Command.Empty>{enabledProviders.size === 0 ? 'No providers configured — open the sidebar to add one.' : 'No model found.'}</Command.Empty>
 								{#each modelGroups as group}
 									<Command.Group heading={group.provider}>
 										{#each group.models as m}
@@ -234,6 +267,40 @@
 						</Command.Root>
 					</Popover.Content>
 				</Popover.Root>
+			</div>
+		{:else if hasActiveProviders}
+			<div class="mx-auto flex max-w-2xl items-center justify-end px-4 pb-2 pt-1">
+				<div class="relative">
+					<button
+					type="button"
+					class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+					onclick={() => (modelSwitcherOpen = !modelSwitcherOpen)}
+				>
+					<span>{currentModelLabel}</span>
+					<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M6 9l6 6 6-6" />
+					</svg>
+				</button>
+				{#if modelSwitcherOpen}
+					<div class="absolute bottom-full right-0 z-10 mb-1 w-80 rounded-xl border border-border/40 bg-popover p-1 shadow-lg">
+						<div class="no-scrollbar max-h-72 overflow-y-auto">
+							{#each modelGroups as group}
+							<div class="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.provider}</div>
+							{#each group.models as m}
+								<button
+									type="button"
+									class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-accent/50 transition-colors"
+									onclick={() => { onModelSelect(m.value); modelSwitcherOpen = false; }}
+								>
+									<span class="w-24 shrink-0 truncate font-mono text-[11px] text-muted-foreground">{m.provider}</span>
+									<span class="truncate">{m.label}</span>
+								</button>
+							{/each}
+							{/each}
+						</div>
+					</div>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	</div>

@@ -20,8 +20,8 @@ export const agentRegistry = new AgentRegistry();
 
 agentRegistry.register({
 	name: 'assistant',
-	modelProvider: 'opencode-go',
-	modelId: 'deepseek-v4-flash',
+	modelProvider: '',
+	modelId: '',
 	systemPrompt: '',
 	toolNames: ['get_time']
 });

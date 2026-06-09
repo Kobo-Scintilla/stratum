@@ -19,9 +19,4 @@ if (!env.ENCRYPTION_KEY) {
 	process.env.ENCRYPTION_KEY = key;
 }
 
-// pi-ai reads API keys from process.env via getEnvApiKey().
-// SvelteKit doesn't expose .env vars on process.env directly,
-// so proxy them here from $env/dynamic/private.
-process.env.OPENCODE_API_KEY = env.OPENCODE_API_KEY;
-
 export const handle = sequence(handleRemult);
