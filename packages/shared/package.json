@@ -1,0 +1,19 @@
+{
+	"name": "@opaius/shared",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./entities/*": "./src/entities/*.ts",
+		"./types": "./src/types.ts"
+	},
+	"scripts": {
+		"check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"remult": "^3.3.12"
+	},
+	"devDependencies": {
+		"typescript": "^6.0.2"
+	}
+}

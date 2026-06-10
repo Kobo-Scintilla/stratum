@@ -1,0 +1,19 @@
+<script lang="ts">
+	import type { SVGAttributes } from 'svelte/elements';
+
+	let {
+		fill = 'currentColor',
+		class: className,
+		...restProps
+	}: SVGAttributes<SVGSVGElement> = $props();
+</script>
+
+<svg
+	xmlns="http://www.w3.org/2000/svg"
+	viewBox="0 0 24 24"
+	{fill}
+	class="remixicon ri-bar-chart-horizontal-fill {className}"
+	{...restProps}
+>
+	<path d="M12 3V7H3V3H12ZM16 17V21H3V17H16ZM22 10V14H3V10H22Z" />
+</svg>
