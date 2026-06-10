@@ -1,7 +1,12 @@
 import { remult } from 'remult';
+import { AgentService } from '@opaius/shared/controllers/agent-service.js';
 
 export async function load() {
-	const res = await fetch('http://localhost:3001/api/listSessions');
-	const sessions = await res.json();
-	return { sessions };
+	try {
+		const sessions = await remult.call(AgentService.listSessions, undefined);
+		return { sessions };
+	} catch (e) {
+		console.error('[layout.server] listSessions failed:', e);
+		return { sessions: [] };
+	}
 }

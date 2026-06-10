@@ -2,6 +2,7 @@ import { Type } from '@earendil-works/pi-ai';
 import type { ToolDefinition, ToolResult } from './types.js';
 import type { Tool as PiAiTool } from '@earendil-works/pi-ai';
 import { getTimeTool } from './tools/get-time.js';
+import { getPiCodingTools } from './tools/pi-tools.js';
 
 export type { ToolDefinition, ToolResult };
 
@@ -40,3 +41,10 @@ class ToolRegistry {
 export const toolRegistry = new ToolRegistry();
 
 toolRegistry.register(getTimeTool);
+
+// Register OMP SDK tools (read, write, edit, bash, grep, find, ls)
+const piTools = getPiCodingTools(process.cwd());
+for (const tool of piTools) {
+	toolRegistry.register(tool);
+}
+

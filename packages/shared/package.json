@@ -4,13 +4,15 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./entities/*": "./src/entities/*.ts",
-		"./types": "./src/types.ts"
+		"./entities/*.js": "./src/entities/*.ts",
+		"./types": "./src/types.ts",
+		"./controllers/*.js": "./src/controllers/*.ts"
 	},
 	"scripts": {
 		"check": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@earendil-works/pi-ai": "^0.78.1",
 		"remult": "^3.3.12"
 	},
 	"devDependencies": {

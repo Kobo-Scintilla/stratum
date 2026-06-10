@@ -1,5 +1,5 @@
 import type { Tool as PiAiTool, Message, Model, Context } from '@earendil-works/pi-ai';
-import type { ActiveStream } from '../entities/active-stream';
+import type { ActiveStream } from './entities/active-stream.js';
 
 /** Configuration for a single agent. */
 export interface AgentConfig {

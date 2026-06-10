@@ -74,7 +74,8 @@ export class AgentService {
 			...baseConfig,
 			modelProvider: sessionSettings?.modelProvider ?? baseConfig.modelProvider,
 			modelId: sessionSettings?.modelId ?? baseConfig.modelId,
-			contextWindow: sessionSettings?.contextWindow ?? 20
+			contextWindow: sessionSettings?.contextWindow ?? 20,
+			thinkingLevel: sessionSettings?.thinkingLevel ?? 'medium'
 		};
 
 		// 2. Validate provider is selected

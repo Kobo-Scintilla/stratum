@@ -1,8 +1,9 @@
 import { browser } from '$app/environment';
 import { remult } from 'remult';
-import { ChatMessage } from '../shared/entities/chat-message';
-import { ActiveStream } from '../shared/entities/active-stream';
-import type { ToolCallInfo } from '../shared/entities/chat-message';
+import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
+import { ActiveStream } from '@opaius/shared/entities/active-stream.js';
+import type { ToolCallInfo } from '@opaius/shared/entities/chat-message.js';
+import { AgentService } from '@opaius/shared/controllers/agent-service.js';
 
 // ── Enriched display types ──────────────────────────────────────
 
@@ -68,14 +69,20 @@ export function getChatSession(
 	initialSession?: string,
 	initialMessages?: ChatMessage[]
 ): ChatSession {
-	if (!browser) {
-		return createChatSession(initialSession, initialMessages);
-	}
+	if (!browser) return createChatSession(initialSession, initialMessages);
+
 	if (!activeSession) {
+		// svelte-ignore state_referenced_locally
 		activeSession = createChatSession(initialSession, initialMessages);
-	} else if (initialSession && activeSession.sessionId !== initialSession) {
+		return activeSession;
+	}
+
+	// svelte-ignore state_referenced_locally
+	if (initialSession && activeSession.sessionId !== initialSession) {
+		// svelte-ignore state_referenced_locally
 		activeSession.switchSession(initialSession, initialMessages);
 	}
+
 	return activeSession;
 }
 
@@ -141,7 +148,9 @@ export function createChatSession(
 		);
 	}
 
+	// svelte-ignore state_referenced_locally
 	if (browser && sessionId) {
+		// svelte-ignore state_referenced_locally
 		const initSid = sessionId;
 		queueMicrotask(() => subscribe(initSid, currentLimit));
 	}
@@ -192,15 +201,7 @@ export function createChatSession(
 			isSending = true;
 			error = '';
 			try {
-				const res = await fetch('http://localhost:3001/api/ask', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ prompt, sessionId: sid })
-				});
-				if (!res.ok) {
-					const err = await res.text();
-					throw new Error(err);
-				}
+				await AgentService.ask(prompt, sid);
 			} catch (err: unknown) {
 				error = err instanceof Error ? err.message : String(err);
 			} finally {

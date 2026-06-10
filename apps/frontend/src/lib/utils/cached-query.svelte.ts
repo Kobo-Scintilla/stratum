@@ -4,16 +4,6 @@
  * Returns immediately from cache (memory then localStorage), refreshes in
  * background. The returned object is reactive via Svelte 5 $state — use its
  * properties directly in templates or $derived expressions.
- *
- * ```ts
- * const providers = createCachedQuery('providerInfo',
- *   () => AgentService.getProvidersInfo(),
- *   { persistence: 'local' }
- * );
- *
- * // In template: {providers.data} or {#if !providers.loading}...
- * // Force refresh: providers.refresh()
- * ```
  */
 type Persistence = 'none' | 'local' | 'session';
 
@@ -24,8 +14,6 @@ export interface CachedQuery<T> {
 	readonly error: string | null;
 	refresh(): Promise<void>;
 }
-
-// ── Storage helpers ──
 
 function storage(p: Persistence): Storage | undefined {
 	if (typeof localStorage === 'undefined') return;
@@ -56,19 +44,14 @@ function saveToCache<T>(key: string, data: T, p: Persistence, ttl: number) {
 	try {
 		const expires = ttl ? Date.now() + ttl : 0;
 		s.setItem('cq:' + key, JSON.stringify({ data, expires }));
-	} catch {
-		/* quota */
-	}
+	} catch { /* quota */ }
 }
-
-// ── Instance class (reactive via $state in .svelte.ts) ──
 
 class CachedQueryInstance<T> implements CachedQuery<T> {
 	data = $state<T>() as T;
 	loading = $state(true);
 	refreshing = $state(false);
 	error = $state<string | null>(null);
-
 	private initialized = false;
 
 	constructor(
@@ -79,11 +62,7 @@ class CachedQueryInstance<T> implements CachedQuery<T> {
 	) {}
 
 	async refresh(): Promise<void> {
-		if (!this.initialized) {
-			// First call — always run, even if we have cached data,
-			// so the background refresh populates fresh data
-			this.initialized = true;
-		}
+		if (!this.initialized) this.initialized = true;
 		this.refreshing = true;
 		try {
 			const result = await this.fetcher();
@@ -99,8 +78,6 @@ class CachedQueryInstance<T> implements CachedQuery<T> {
 	}
 }
 
-// ── Registry (deduplicate by key across components) ──
-
 const registry = new Map<string, CachedQueryInstance<unknown>>();
 
 export function createCachedQuery<T>(
@@ -113,26 +90,19 @@ export function createCachedQuery<T>(
 
 	const persistence = options?.persistence ?? 'none';
 	const ttl = options?.ttl ?? 0;
-
 	const cached = loadFromCache<T>(key, persistence);
 	const instance = new CachedQueryInstance<T>(key, fetcher, persistence, ttl);
 
-	// Seed from cache if available (so .data is populated before first render)
 	if (cached !== undefined) {
 		instance.data = cached;
 		instance.loading = false;
 	}
 
 	registry.set(key, instance);
-
-	// Fire background refresh on next microtask so the component
-	// has time to set up its reactive bindings first
-	queueMicrotask(() => instance.refresh());
-
+	if (typeof window !== 'undefined') queueMicrotask(() => instance.refresh());
 	return instance;
 }
 
-/** For testing / cleanup. */
 export function clearCachedQuery(key: string) {
 	registry.delete(key);
 	if (typeof localStorage !== 'undefined') {

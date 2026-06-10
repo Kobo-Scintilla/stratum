@@ -1,20 +1,29 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { createQuery } from '$lib/stores/create-query.svelte.js';
+	import { remult } from 'remult';
+	import Button from '../ui/button/button.svelte';
+	import { AgentService } from '@opaius/shared/controllers/agent-service.js';
 	import {
 		Loading02FreeIcons,
 		MessageMultiple02FreeIcons,
 		PlusSignIcon
 	} from '@hugeicons/core-free-icons';
-	import Icon from './Icon.svelte';
+	import Icon from '../Icon.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import Button from './ui/button/button.svelte';
 
 	import { getChatSession } from '$lib/stores/chat-session.svelte.js';
 
-	const sessions = createQuery<{ sessionId: string; createdAt: string; preview: string }[]>(
-		() => fetch('http://localhost:3001/api/listSessions').then(r => r.json()),
+	interface Session {
+		sessionId: string;
+		lastMessage: string;
+		createdAt: Date | string;
+		messageCount: number;
+	}
+
+	const sessions = createQuery<Session[]>(
+		() => remult.call(AgentService.listSessions, undefined) as Promise<Session[]>,
 		$page.data.sessions ?? []
 	);
 	const chat = getChatSession();
@@ -35,10 +44,14 @@
 		const days = Math.floor(hrs / 24);
 		return `${days}d ago`;
 	}
-	let sessionsWithTime = $derived(
+
+	const sessionsWithTime = $derived(
 		sessions.data.map((s) => ({
-			...s,
-			time: timeAgo(s.createdAt, Date.now())
+			sessionId: s.sessionId,
+			preview: s.lastMessage,
+			createdAt: typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
+			messageCount: s.messageCount,
+			time: timeAgo(typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(), Date.now())
 		}))
 	);
 </script>
@@ -65,15 +78,9 @@
 				{#each sessionsWithTime as item (item.sessionId)}
 					<a
 						href="/dashboard/{item.sessionId}"
-						class="flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-all duration-150 last:border-b-0 hover:brightness-110"
+						class="session-item flex w-full items-start gap-3 border-b px-4 py-3 text-left transition-all duration-150 last:border-b-0 hover:brightness-110"
 						class:active-session={$page.params.sessionId === item.sessionId}
-						style="border-color: oklch(0.5 0.08 185 / 0.12); background: transparent;"
-						onmouseenter={(e) => {
-							(e.currentTarget as HTMLElement).style.background = 'oklch(0.17 0.015 170)';
-						}}
-						onmouseleave={(e) => {
-							(e.currentTarget as HTMLElement).style.background = 'transparent';
-						}}
+						style="border-color: oklch(0.5 0.08 185 / 0.12);"
 					>
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
@@ -94,6 +101,10 @@
 </Sidebar.Content>
 
 <style>
+	.session-item {
+		background: transparent;
+	}
+	.session-item:hover,
 	.active-session {
 		background: oklch(0.17 0.015 170) !important;
 	}

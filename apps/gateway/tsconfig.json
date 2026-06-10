@@ -8,9 +8,10 @@
 		"useDefineForClassFields": false,
 		"skipLibCheck": true,
 		"esModuleInterop": true,
-		"outDir": "dist",
-		"rootDir": "src",
-		"sourceMap": true
+		"noEmit": true,
+		"sourceMap": true,
+		"types": ["bun-types"],
+		"allowImportingTsExtensions": true
 	},
 	"include": ["src/**/*.ts"]
 }

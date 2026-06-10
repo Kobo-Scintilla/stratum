@@ -9,15 +9,18 @@
 		"check": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@opaius/shared": "workspace:*",
 		"@earendil-works/pi-ai": "^0.78.1",
-		"hono": "^4.7.0",
+		"@earendil-works/pi-coding-agent": "^0.79.1",
 		"@hono/node-server": "^1.14.0",
-		"remult": "^3.3.12",
-		"headroom-ai": "^0.22.4"
+		"@opaius/shared": "workspace:*",
+		"headroom-ai": "^0.22.4",
+		"hono": "^4.7.0",
+		"pi-hashline-readmap": "^0.9.1",
+		"remult": "^3.3.12"
 	},
 	"devDependencies": {
 		"@types/node": "^25.9.1",
+		"bun-types": "^1.1.0",
 		"typescript": "^6.0.2"
 	}
 }

@@ -12,6 +12,7 @@
 
 <style>
 	.markdown-content {
+		overflow-wrap: break-word;
 		:global(p) {
 			margin: 0.25em 0;
 			&:first-child {
@@ -79,7 +80,9 @@
 			text-decoration: underline;
 		}
 		:global(table) {
+			display: block;
 			width: 100%;
+			overflow-x: auto;
 			border-collapse: collapse;
 			margin: 0.5em 0;
 			font-size: 0.875em;

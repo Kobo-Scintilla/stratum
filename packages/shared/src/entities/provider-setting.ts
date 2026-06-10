@@ -14,11 +14,11 @@ export class ProviderSetting {
 	enabled = true;
 
 	@Fields.string({ allowNull: true })
-	baseUrl?: string; // for custom providers
+	baseUrl?: string = undefined; // for custom providers
 
 	@Fields.string({ allowNull: true })
-	apiType?: string; // 'openai-completions' | 'openai-responses' | 'anthropic-messages'
+	apiType?: string = undefined; // 'openai-completions' | 'openai-responses' | 'anthropic-messages'
 
 	@Fields.string({ allowNull: true })
-	models?: string; // comma-separated model IDs for custom providers
+	models?: string = undefined; // comma-separated model IDs for custom providers
 }

@@ -1,6 +1,6 @@
 import { remult } from 'remult';
 import { getModel, streamSimple } from '@earendil-works/pi-ai';
-import type { AssistantMessageEvent, Message } from '@earendil-works/pi-ai';
+import type { AssistantMessageEvent, Message, Usage } from '@earendil-works/pi-ai';
 import { ActiveStream } from '@opaius/shared/entities/active-stream.js';
 import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
 import { ProviderSetting } from '@opaius/shared/entities/provider-setting.js';
@@ -61,7 +61,12 @@ async function insertAssistantMessage(
 	sessionId: string,
 	text: string,
 	toolCalls: TrackedToolCall[],
-	sortOrder: number
+	sortOrder: number,
+	inputTokens = 0,
+	outputTokens = 0,
+	cacheReadTokens = 0,
+	cacheWriteTokens = 0,
+	contextMessages = 0
 ): Promise<void> {
 	await remult.repo(ChatMessage).insert({
 		id: crypto.randomUUID(),
@@ -73,7 +78,12 @@ async function insertAssistantMessage(
 				? toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args }))
 				: undefined,
 		sortOrder,
-		createdAt: new Date(sortOrder)
+		createdAt: new Date(sortOrder),
+		inputTokens,
+		outputTokens,
+		cacheReadTokens,
+		cacheWriteTokens,
+		contextMessages
 	});
 }
 
@@ -106,6 +116,8 @@ interface StreamState {
 	toolCalls: TrackedToolCall[];
 	segments: ActiveStream['segments'];
 	lastUpdate: number;
+	isThinking: boolean;
+	usage: Usage | null;
 }
 
 const THROTTLE_MS = 100;
@@ -115,6 +127,16 @@ async function handleTextDelta(
 	state: StreamState,
 	stream: ActiveStream
 ) {
+	if (state.isThinking) {
+		state.isThinking = false;
+		state.accumulatedText += '</think>';
+		const last = state.segments[state.segments.length - 1];
+		if (last?.type === 'text') {
+			last.text += '</think>';
+		} else {
+			state.segments.push({ type: 'text', text: '</think>' });
+		}
+	}
 	const t = event.delta;
 	if (!t) return;
 	state.accumulatedText += t;
@@ -188,11 +210,76 @@ async function handleToolCallEnd(
 	await updateActiveStream(stream, state.accumulatedText, state.toolCalls, state.segments);
 }
 
+async function handleThinkingStart(
+	event: AssistantMessageEvent & { type: 'thinking_start' },
+	state: StreamState,
+	stream: ActiveStream
+) {
+	state.isThinking = true;
+	state.accumulatedText += '<think>';
+	state.segments.push({ type: 'text', text: '<think>' });
+	await updateActiveStream(stream, state.accumulatedText, state.toolCalls, state.segments);
+}
+
+async function handleThinkingDelta(
+	event: AssistantMessageEvent & { type: 'thinking_delta' },
+	state: StreamState,
+	stream: ActiveStream
+) {
+	const t = event.delta;
+	if (!t) return;
+	state.accumulatedText += t;
+	if (state.lastWasTool || state.segments.length === 0) {
+		state.segments.push({ type: 'text', text: t });
+		state.lastWasTool = false;
+	} else {
+		const last = state.segments[state.segments.length - 1];
+		if (last.type === 'text') last.text += t;
+	}
+	const now = Date.now();
+	if (now - state.lastUpdate > THROTTLE_MS) {
+		await updateActiveStream(stream, state.accumulatedText, state.toolCalls, state.segments);
+		state.lastUpdate = now;
+	}
+}
+
+async function handleThinkingEnd(
+	event: AssistantMessageEvent & { type: 'thinking_end' },
+	state: StreamState,
+	stream: ActiveStream
+) {
+	state.isThinking = false;
+	state.accumulatedText += '</think>';
+	const last = state.segments[state.segments.length - 1];
+	if (last?.type === 'text') {
+		last.text += '</think>';
+	} else {
+		state.segments.push({ type: 'text', text: '</think>' });
+	}
+	await updateActiveStream(stream, state.accumulatedText, state.toolCalls, state.segments);
+}
+
 function handleDone(
 	event: AssistantMessageEvent & { type: 'done' },
 	state: StreamState,
-	context: Context
+	context: Context,
+	stream: ActiveStream
 ) {
+	// Close thinking block if still open
+	if (state.isThinking) {
+		state.isThinking = false;
+		state.accumulatedText += '</think>';
+		const last = state.segments[state.segments.length - 1];
+		if (last?.type === 'text') {
+			last.text += '</think>';
+		} else {
+			state.segments.push({ type: 'text', text: '</think>' });
+		}
+	}
+
+	// Save usage from the done event
+	state.usage = event.message.usage;
+
 	const content: (
 		| { type: 'text'; text: string }
 		| { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }
@@ -213,6 +300,7 @@ function handleDone(
 	} as unknown as Message);
 }
 
+
 export async function runStreamLoop(
 	config: AgentConfig,
 	context: Context,
@@ -232,11 +320,17 @@ export async function runStreamLoop(
 		lastWasTool: false,
 		toolCalls: [],
 		segments: [],
-		lastUpdate: 0
+		lastUpdate: 0,
+		isThinking: false,
+		usage: null
 	};
 
 	while (true) {
-		const eventStream = streamSimple(model, context);
+		const options: any = {};
+		if (config.thinkingLevel && config.thinkingLevel !== 'off') {
+			options.reasoning = config.thinkingLevel;
+		}
+		const eventStream = streamSimple(model, context, options);
 
 		for await (const event of eventStream) {
 			switch (event.type) {
@@ -249,8 +343,17 @@ export async function runStreamLoop(
 				case 'toolcall_end':
 					await handleToolCallEnd(event, state, stream);
 					break;
+				case 'thinking_start':
+					await handleThinkingStart(event, state, stream);
+					break;
+				case 'thinking_delta':
+					await handleThinkingDelta(event, state, stream);
+					break;
+				case 'thinking_end':
+					await handleThinkingEnd(event, state, stream);
+					break;
 				case 'done':
-					handleDone(event, state, context);
+					handleDone(event, state, context, stream);
 					break;
 				case 'error':
 					console.error('[stream] stream error:', event.error);
@@ -266,7 +369,17 @@ export async function runStreamLoop(
 
 		// ── Save assistant message to DB for history ──
 		if (state.accumulatedText || state.toolCalls.length > 0) {
-			await insertAssistantMessage(sessionId, state.accumulatedText, state.toolCalls, Date.now());
+			await insertAssistantMessage(
+				sessionId,
+				state.accumulatedText,
+				state.toolCalls,
+				Date.now(),
+				state.usage?.input ?? 0,
+				state.usage?.output ?? 0,
+				state.usage?.cacheRead ?? 0,
+				state.usage?.cacheWrite ?? 0,
+				context.messages.length
+			);
 			await updateActiveStream(stream, '', [], []);
 		}
 
@@ -304,5 +417,16 @@ export async function runStreamLoop(
 		state.accumulatedText = '';
 		state.toolCalls = [];
 		state.segments = [];
+	}
+	// Close thinking block if still open after the loop
+	if (state.isThinking) {
+		state.isThinking = false;
+		state.accumulatedText += '</think>';
+		const last = state.segments[state.segments.length - 1];
+		if (last?.type === 'text') {
+			last.text += '</think>';
+		} else {
+			state.segments.push({ type: 'text', text: '</think>' });
+		}
 	}
 }

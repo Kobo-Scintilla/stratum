@@ -14,13 +14,16 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
-		"@opaius/shared": "workspace:*",
 		"@hugeicons/core-free-icons": "^4.2.0",
 		"@hugeicons/svelte": "^1.1.2",
+		"@opaius/shared": "workspace:*",
+		"formsnap": "^2.0.1",
 		"marked": "^18.0.5",
 		"remult": "^3.3.12",
 		"svelte-persisted-state": "^1.4.1",
-		"svelte-sonner": "^1.1.1"
+		"svelte-sonner": "^1.1.1",
+		"sveltekit-superforms": "^2.30.1",
+		"zod": "3"
 	},
 	"devDependencies": {
 		"@fontsource-variable/outfit": "^5.2.8",

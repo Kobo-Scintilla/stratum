@@ -4,7 +4,29 @@ const ALGORITHM = 'aes-256-gcm' as const;
 const IV_LENGTH = 16;
 const TAG_LENGTH = 16;
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 function getKey(): Buffer {
+	if (!process.env.ENCRYPTION_KEY) {
+		const searchPaths = [
+			path.join(process.cwd(), '.encryption-key'),
+			path.join(__dirname, '.encryption-key'),
+			path.join(__dirname, '..', '.encryption-key'),
+			path.join(__dirname, '..', '..', '.encryption-key'),
+			path.join(__dirname, '..', '..', '..', '.encryption-key'),
+		];
+		for (const checkPath of searchPaths) {
+			if (fs.existsSync(checkPath)) {
+				process.env.ENCRYPTION_KEY = fs.readFileSync(checkPath, 'utf8').trim();
+				break;
+			}
+		}
+	}
 	const key = process.env.ENCRYPTION_KEY;
 	if (!key || key.length === 0) {
 		throw new Error('ENCRYPTION_KEY environment variable is not set');

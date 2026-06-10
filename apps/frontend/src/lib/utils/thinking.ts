@@ -3,10 +3,6 @@ export interface ParsedBlock {
 	text: string;
 }
 
-/**
- * Parses a string containing optional <think>...</think> blocks
- * into an array of text and thinking segments.
- */
 export function parseThinking(content: string): ParsedBlock[] {
 	if (!content) return [];
 	const blocks: ParsedBlock[] = [];

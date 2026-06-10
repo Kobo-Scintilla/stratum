@@ -23,5 +23,5 @@ agentRegistry.register({
 	modelProvider: '',
 	modelId: '',
 	systemPrompt: '',
-	toolNames: ['get_time']
+	toolNames: ['get_time', 'read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'ast_search']
 });

@@ -25,16 +25,16 @@ export class ChatMessage {
 	content = '';
 
 	@Fields.object()
-	toolCalls?: ToolCallInfo[];
+	toolCalls?: ToolCallInfo[] = undefined;
 
 	@Fields.string()
-	toolCallId?: string;
+	toolCallId?: string = undefined;
 
 	@Fields.string()
-	toolName?: string;
+	toolName?: string = undefined;
 
 	@Fields.object()
-	toolResult?: unknown;
+	toolResult?: unknown = undefined;
 
 	@Fields.boolean()
 	isError = false;
@@ -44,4 +44,19 @@ export class ChatMessage {
 
 	@Fields.date()
 	createdAt = new Date();
+
+	@Fields.integer()
+	inputTokens = 0;
+
+	@Fields.integer()
+	outputTokens = 0;
+
+	@Fields.integer()
+	cacheReadTokens = 0;
+
+	@Fields.integer()
+	cacheWriteTokens = 0;
+
+	@Fields.integer()
+	contextMessages = 0;
 }

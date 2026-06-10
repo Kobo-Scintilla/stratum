@@ -7,6 +7,7 @@ export interface AgentConfig {
 	systemPrompt?: string;
 	toolNames: string[];
 	contextWindow?: number;
+	thinkingLevel?: string;
 }
 
 /** A tool that an agent can call. */

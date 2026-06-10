@@ -130,7 +130,7 @@ Example — destructive op:
 
 ## Boundaries
 
-Code/commits/PRs: write normal. "stop caveman" or "normal mode": revert. Level persist until changed or session end.
+Code/commits/PRs: write normal. "stop caveman" / "normal mode": revert. Level persist until changed or session end.
 
 ---
 
@@ -138,85 +138,81 @@ Code/commits/PRs: write normal. "stop caveman" or "normal mode": revert. Level p
 
 ## Project Overview
 
-AI chat dashboard built with SvelteKit 5 + Flue agent runtime. Users converse with LLM agents in sessions; messages persisted to SQLite via Remult ORM. The app uses a dark petroleum/verdigris theme, shadcn-svelte UI, and Tailwind CSS v4.
+Turborepo monorepo (bun workspaces):
+- **`apps/frontend/`** — SvelteKit 5 UI (SSR + dashboard + chat)
+- **`apps/gateway/`** — Hono + Remult + pi-ai backend (agent loop, SQLite, tools)
+- **`packages/shared/`** — Remult entities + shared types
+
+Users converse with LLM agents in sessions; messages persisted to SQLite via Remult ORM on the gateway. Frontend connects to gateway via Remult API client at `http://localhost:3001/api`. Dark petroleum/verdigris theme, shadcn-svelte UI, Tailwind CSS v4.
 
 ## Architecture & Data Flow
 
 ```
 Browser (SvelteKit frontend)
   │
-  ▼ load() / form actions / fetch
-SvelteKit server
-  ├── hooks.server.ts  ──  Env proxy ($env/dynamic/private → process.env), Remult handler
-  ├── api/[...remult]  ──  Remult CRUD REST (entities + controllers)
-  │
-  ├── $lib/server/
-  │   └── api.ts       ──  Remult API setup (SQLite, entities, admin UI)
-  │
-  ├── $lib/shared/
-  │   ├── types.ts          ──  Agent event types
-  │   ├── services/
-  │   │   └── agent-service.ts  ──  Remult controller: ask(), recoverMessages()
-  │   ├── stores/
-  │   │   ├── chat.svelte.ts    ──  Chat session state (createChatSession)
-  │   │   └── create-query.svelte.ts  ──  createQuery rune helper
-  │   ├── entities/
-  │   │   ├── active-stream.ts  ──  ActiveStream entity
-  │   │   └── chat-message.ts   ──  ChatMessage entity
-  │   └── components/
-  │       ├── chat/             ──  Chat UI components (ChatInput, ChatStream, ...)
-  │       └── sidebar-*.svelte  ──  Sidebar components
-  │
-  └── routes/
-      ├── +layout.svelte    ──  Root layout, nav state init
-      ├── dashboard/        ──  Dashboard layout (sidebar + content)
-      └── api/[...remult]   ──  Remult REST endpoint catch-all
+  │ remult.apiClient.url = 'http://localhost:3001/api'
+  │ fetch() for BackendMethods
+  ▼
+Gateway (Hono + Remult + pi-ai)
+  ├── api.ts       ── Remult API (bun:sqlite, entities, controllers)
+  ├── encryption   ── AES-256-GCM key encrypt/decrypt
+  ├── agent-service.ts  ── @BackendMethod controller: ask(), recoverMessages()
+  └─ agent-runtime/     ── pi-ai loop, context building, tool execution
+       └── tools/        ── Agent tool definitions (get-time, etc.)
+       
 
-tools-archive/   ──  Flue agent tools (execute, compress, search, handoff)
-
-SQLite (db.sqlite)
-  └── chatMessages, activeStreams  ──  Remult-managed tables
-      indexedContent, compressedArtifact  ──  Knowledge store
-      chunks_fts (FTS5)     ──  Full-text search virtual table
+SQLite (db.sqlite at repo root)
+  ├── chatMessages
+  ├── activeStreams
+  └── providerSettings
 ```
 
-**Data flow**: User sends message → `AgentService.ask()` → pi-ai `runAgentLoop` → LLM streaming → events update `ActiveStream` in DB → live queries push to UI.
-
-**Two SQLite handles**: `api.ts` owns the primary connection (Remult entities); `execute.ts`/`search.ts` open a second for FTS5 MATCH queries.
+**Data flow**: User sends message → frontend `POST /api/ask` → gateway `AgentService.ask()` → pi-ai `runStreamLoop` → LLM streaming → events update `ActiveStream` in DB → Remult SSE pushes changes to frontend live queries.
 
 ## Key Directories
 
-| Path                       | Purpose                                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| `src/lib/server/`          | Server-only modules: Flue runtime init, agent config, Remult API setup                    |
-| `src/lib/shared/`          | Shared code: Remult entities, AgentService, chat session, types, FlueSessionStore         |
-| `src/lib/shared/entities/` | Remult entity classes (ActiveStream, ChatMessage, FlueSession)                            |
-| `src/lib/stores/`          | Svelte 5 runes-based state (nav-state, persisted to localStorage + cookie)                |
-| `src/lib/components/`      | Svelte 5 components (app-sidebar, sidebar-nav, sidebar-session-list + shadcn-svelte UI)   |
-| `src/lib/components/ui/`   | shadcn-svelte UI primitives (button, input, sidebar, sheet, tooltip, separator, skeleton) |
-| `src/lib/hooks/`           | Svelte 5 runes hooks (IsMobile media query)                                               |
-| `src/routes/`              | SvelteKit routes (layout, dashboard, Remult API catch-all)                                |
-| `tools-archive/`           | Custom Flue agent tools (execute, compress, search/index, handoff)                        |
-| `tools-archive/__tests__/` | Tool unit tests and integration tests                                                     |
+| Path (apps/frontend/)        | Purpose                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `src/routes/`                | SvelteKit routes (layout, dashboard)                                   |
+| `src/lib/stores/`            | Svelte 5 runes state (chat-session, nav-state, providers-state)        |
+| `src/lib/components/`        | UI components (sidebar, chat, shadcn-svelte)                           |
+| `src/lib/components/ui/`     | shadcn-svelte primitives (button, input, sidebar, dialog, ...)         |
+| `src/hooks.server.ts`        | Server init: bootstrap encryption key, set remult.apiClient.url        |
+
+| Path (apps/gateway/)         | Purpose                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `src/index.ts`               | Hono server entry (port 3001, CORS, routes)                            |
+| `src/api.ts`                 | Remult API setup (bun:sqlite, entities, controllers, admin)            |
+| `src/agent-service.ts`       | @BackendMethod controller (ask, provider CRUD, sessions)               |
+| `src/agent-runtime/`         | pi-ai agent loop, context builder, tool definitions                    |
+| `src/encryption.ts`          | AES-256-GCM server-side encryption for provider API keys               |
+| `src/flue-session-store.ts`  | Flue agent session persistence (if used)                               |
+
+| Path (packages/shared/)      | Purpose                                                                |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| `src/entities/`              | Remult entity classes (ChatMessage, ActiveStream, ProviderSetting)     |
+| `src/types.ts`               | Agent event types shared between gateway and frontend                  |
 
 ## Development Commands
 
 ```bash
-bun run dev       # Start dev server (vite dev --host 0.0.0.0)
-bun run build     # Production build (vite build)
-bun run preview   # Preview production build
-bun run check     # svelte-kit sync + svelte-check (type-check)
-bun run lint      # prettier --check .
-bun run format    # prettier --write .
-bun run prepare   # svelte-kit sync (run after pull/clone)
-```
+# Root — starts both gateway + frontend
+bun run dev          # turbo run dev
 
-Test files live in `tools-archive/__tests__/` and use `node:test`:
+# Or individually:
+cd apps/gateway && bun dev       # Hono server (port 3001)
+cd apps/frontend && bun dev      # SvelteKit (port 5173)
 
-```bash
-bun tools-archive/__tests__/tools.test.ts
-bun tools-archive/__tests__/execute_auto_index.test.ts
-bun tools-archive/__tests__/new-wiring.test.ts
+# Type-check
+cd apps/frontend && bun run check       # svelte-kit sync + svelte-check
+cd apps/gateway && bunx tsc --noEmit    # gateway type check
+
+# Build
+bun run build        # turbo run build
+
+# Utils
+bun run format       # prettier --write .
+bun run lint         # prettier --check .
 ```
 
 ## Code Conventions & Common Patterns
@@ -225,18 +221,16 @@ bun tools-archive/__tests__/new-wiring.test.ts
 
 ```svelte
 <script lang="ts">
-	let { children, data } = $props(); // component props
-	let count = $state(0); // reactive state
-	let doubled = $derived(count * 2); // derived
-	$effect(() => {
-		/* auto-track */
-	}); // side effects
+	let { children, data } = $props();
+	let count = $state(0);
+	let doubled = $derived(count * 2);
+	$effect(() => { /* auto-track */ });
 </script>
 ```
 
-Runes mode forced via `svelte.config.js` (`runes: ({ filename }) => ...`).
+Runes mode forced via `svelte.config.js`.
 
-### Remult Entities
+### Remult Entities (packages/shared/)
 
 Decorator-based ORM with auto-generated REST + live queries:
 
@@ -248,42 +242,19 @@ export class ChatMessage {
 
 	@Fields.string()
 	role: 'user' | 'assistant' | 'tool' = 'user';
-	// ...
 }
 ```
 
 - `remult.repo(Entity)` for type-safe CRUD
-- `remult.repo(Entity).liveQuery({ where, orderBy }).subscribe(...)` for real-time UI
-- Controller methods via `BackendMethod` decorator on classes in `AgentService.ts`
-
-### Global Singletons for Cross-Module Access
-
-```ts
-// app.d.ts
-declare global {
-	var flue: FlueBridge | undefined;
-	var remultApi: { withRemult(event, what): Promise<void> } | undefined;
-}
-```
-
-Set at module import time (`server/flue.ts`, `server/api.ts`). Used by tools and services to bridge into Flue/Remult runtime context.
-
-### `withRemult` Context Wrapper
-
-Any async code calling `remult.repo()` outside a request cycle must wrap:
-
-```ts
-globalThis.remultApi.withRemult(undefined, async () => {
-  await remult.repo(Entity).insert({...});
-});
-```
-
-Used in `FlueSessionStore`, `execute.ts`, `compress.ts`, `search.ts`.
+- `remult.repo(Entity).liveQuery({ where, orderBy }).subscribe(...)` for real-time SSE updates
+- Frontend imports entities from `@opaius/shared/entities/*.js`
+- Gateway runs `@BackendMethod` controllers registered in `api.ts`
 
 ### Path Aliases
 
-- `$lib` → `src/lib/` (all imports: `$lib/server/engine`, `$lib/shared/types`, etc.)
-- `$app/*` → SvelteKit environment modules (`$app/environment`, `$app/forms`, etc.)
+- `$lib` → `apps/frontend/src/lib/` (SvelteKit, configured in `.svelte-kit/tsconfig.json`)
+- `@opaius/shared` → `../../packages/shared/src` (configured in `svelte.config.js` `kit.alias`)
+- `@opaius/shared/entities/*` → resolved via `package.json` exports field
 
 ### Naming & Formatting
 
@@ -292,86 +263,56 @@ Used in `FlueSessionStore`, `execute.ts`, `compress.ts`, `search.ts`.
 | Indentation     | Tabs                                                                                        |
 | Quotes          | Single                                                                                      |
 | Trailing commas | None                                                                                        |
-| Print width     | 100                                                                                         |
 | File naming     | `kebab-case` for files, `PascalCase` for classes/components, `camelCase` for functions/vars |
 | Svelte files    | `feature-name.svelte`, grouped in `ui/` for primitives                                      |
-| Decorator order | `@Entity` on class, `@Fields.*` on fields                                                   |
 
 ### CSS / Styling
 
 - Tailwind CSS v4 (CSS-based config, no `tailwind.config.js`)
 - `@import 'tailwindcss'` in `layout.css`
-- Utility classes + custom CSS properties via `@theme inline { }`
 - `cn()` utility from `$lib/utils.ts` for conditional classes (`clsx` + `tailwind-merge`)
-- shadcn-svelte "maia" style with remixicon icon library
+- shadcn-svelte "maia" style with remixicon icons
 - Color scheme: oklch-based petroleum/verdigris (dark-only)
-- Custom scrollbars, grid background on body, glow animations
-
-### Tool Patterns (tools-archive/)
-
-Each tool:
-
-1. Exported via `defineTool({ name, description, params, execute })` from `@flue/runtime`
-2. Lazy-imports `api.ts` via `ensureRemult()` when `globalThis.remultApi` is absent
-3. Wraps Remult ops in `runInRemultContext(fn)`
-4. Barrel-exported from `tools-archive/index.ts`
 
 ## Important Files
 
-| File                                       | Purpose                                                                                                             |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `svelte.config.js`                         | SvelteKit config (Node adapter, runes mode forced)                                                                  |
-| `vite.config.ts`                           | Vite config (Tailwind CSS v4 plugin, SSR noExternal for hugeicons)                                                  |
-| `tsconfig.json`                            | TS strict mode, experimentalDecorators, extends `.svelte-kit/tsconfig.json`                                         |
-| `.prettierrc`                              | Prettier: tabs, single quotes, no trailing commas, 100 width                                                        |
-| `src/hooks.server.ts`                      | Server init: bootstraps encryption key, wires Remult handler                                                        |
-| `src/lib/server/api.ts`                    | Remult API: SQLite connection, entity registration, admin UI                                                        |
-| `src/lib/shared/services/agent-service.ts` | Main Remult controller: `ask()`, `recoverMessages()`, `listSessions()` — uses pi-ai directly                        |
-| `src/lib/shared/entities/active-stream.ts` | ActiveStream entity (streaming state during agent turns)                                                            |
-| `src/lib/shared/entities/chat-message.ts`  | ChatMessage entity (persisted messages)                                                                             |
-| `src/lib/shared/types.ts`                  | Agent event types (`text_delta`, `tool_call`, `error`, etc.)                                                        |
-| `src/lib/stores/chat.svelte.ts`            | Svelte 5 runes chat session (createChatSession)                                                                     |
-| `tools-archive/`                           | Flue agent tools (execute, compress, search/index, handoff)                                                         |
+| File (apps/frontend/)                               | Purpose                                                   |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `svelte.config.js`                                  | SvelteKit config (adapter-node, alias for @opaius/shared) |
+| `vite.config.ts`                                    | Tailwind plugin, SSR noExternal for hugeicons             |
+| `tsconfig.json`                                     | Extends `.svelte-kit/tsconfig.json`, experimentalDecorators |
+| `src/hooks.server.ts`                               | Bootstraps encryption key, sets remult.apiClient.url      |
+| `src/lib/stores/chat-session.svelte.ts`             | Chat session state + gateway API calls                    |
 
-## API Key Management (Sidebar Providers)
+| File (apps/gateway/)                                | Purpose                                                   |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `src/index.ts`                                      | Hono server entry (CORS, port 3001)                       |
+| `src/api.ts`                                        | Remult API (bun:sqlite, entities, controllers)            |
+| `src/agent-service.ts`                              | All @BackendMethod controllers                            |
+| `src/encryption.ts`                                 | AES-256-GCM encrypt/decrypt                               |
 
-API keys are managed through the sidebar Providers UI — stored encrypted in SQLite via `ProviderSetting` entity, never in `.env` or hardcoded.
+| File (packages/shared/)                             | Purpose                                                   |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `src/entities/active-stream.ts`                     | ActiveStream entity (streaming state)                     |
+| `src/entities/chat-message.ts`                      | ChatMessage entity (persisted messages)                   |
+| `src/entities/provider-setting.ts`                  | ProviderSetting entity (encrypted API keys)               |
+| `src/types.ts`                                      | Agent event types                                         |
 
-On each `ask()` request, `agent-service.ts` reads all configured providers from DB, decrypts their keys, and sets `process.env` for pi-ai to pick up via `getEnvApiKey()`. This way keys are managed at runtime through the UI, not at deploy time.
+## API Key Management
+
+Keys managed through sidebar Providers UI — stored encrypted in SQLite via `ProviderSetting` entity. On each `ask()` request, gateway reads all configured providers, decrypts keys via `encryption.ts`, sets `process.env` for pi-ai to find via `getEnvApiKey()`.
 
 ## Runtime / Tooling Preferences
 
-- **Runtime**: Bun
-- **Package manager**: Bun
-- **TypeScript**: v6, strict mode, `experimentalDecorators: true` (for Remult decorators)
-- **Module system**: ESM (`"type": "module"`)
-- **Module resolution**: bundler
-- **Path aliases**: `$lib` → `src/lib/` (SvelteKit convention)
-- **Linting/formatting**: Prettier only (no ESLint — `.prettierrc` and `.prettierignore`)
-- **Static analysis**: Fallow (cyclomatic ≤20, cognitive ≤15, gate: new-only)
-- **CSS framework**: Tailwind CSS v4 (import-based config, Vite plugin)
-- **UI library**: shadcn-svelte (maia style) + bits-ui
-- **Icons**: Lucide Svelte + Remixicon Svelte
+- **Runtime**: Bun (all commands via `bun`, never `npx`/`pnpm`/`npm`)
+- **Monorepo**: Turborepo + bun workspaces
+- **TypeScript**: v6, strict, `experimentalDecorators: true`
+- **Module**: ESM (`"type": "module"` everywhere)
+- **Module resolution**: bundler (frontend), NodeNext (gateway/shared)
+- **Path aliases**: `$lib` (SvelteKit), `@opaius/shared` (workspace package)
+- **Formatting**: Prettier only (tabs, single quotes, no trailing commas)
+- **CSS**: Tailwind CSS v4
+- **UI**: shadcn-svelte (maia style) + bits-ui
+- **Icons**: Remixicon Svelte + Hugeicons
 - **Font**: Outfit Variable
-
-## Testing & QA
-
-- **Framework**: Node.js built-in `node:test` + `node:assert/strict`
-- **Runner**: `bun <test-file>` (natively runs TypeScript + ESM)
-- **No test runner config** — run test files directly
-- Tests live in `tools-archive/__tests__/` alongside the code they test
-- Test patterns: `describe`/`it` blocks, `assert.strictEqual`/`assert.ok`/`assert.rejects`
-- Tests create/truncate `db.sqlite` — must run from project root
-- No UI/component testing yet (no Playwright, no Vitest)
-- No coverage thresholds defined
-
-### Running tests
-
-```bash
-bun tools-archive/__tests__/tools.test.ts
-bun tools-archive/__tests__/execute_auto_index.test.ts    # needs db.sqlite
-bun tools-archive/__tests__/new-wiring.test.ts            # needs db.sqlite
-bun tools-archive/__tests__/handoff.test.ts
-bun tools-archive/__tests__/debug_index.test.ts
-bun tools-archive/__tests__/compression-benchmark.ts
-```
+- **Database**: bun:sqlite via `remult/remult-bun-sqlite`

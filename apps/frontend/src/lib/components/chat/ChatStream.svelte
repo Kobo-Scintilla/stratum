@@ -4,7 +4,7 @@
 	import { BotIcon } from '@hugeicons/core-free-icons';
 	import Markdown from '$lib/components/Markdown.svelte';
 	import ToolCall from './ToolCall.svelte';
-	import { parseThinking } from '$lib/shared/utils/thinking';
+	import { parseThinking } from '$lib/utils/thinking.js';
 	import { BrainIcon } from '@hugeicons/core-free-icons';
 
 	type Segment =

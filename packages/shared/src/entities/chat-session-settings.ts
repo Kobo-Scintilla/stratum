@@ -15,4 +15,7 @@ export class ChatSessionSettings {
 
 	@Fields.integer()
 	contextWindow = 20;
+
+	@Fields.string()
+	thinkingLevel = 'medium';
 }

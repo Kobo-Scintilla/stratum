@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AppSidebar from '$lib/components/AppSidebar.svelte';
+	import AppSidebar from '$lib/components/sidebar/AppSidebar.svelte';
 	import { useNavState } from '$lib/stores/nav-state.svelte.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	let { children } = $props();

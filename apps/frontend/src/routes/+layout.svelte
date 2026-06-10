@@ -26,6 +26,11 @@
 			});
 			x.subscribe({ reportObserved: () => s2(), reportChanged: () => update2() });
 		};
+
+	// Point Remult client to gateway (matches hooks.server.ts for client side)
+	if (import.meta.env.SSR === false) {
+		remult.apiClient.url = 'http://localhost:3001/api';
+	}
 	}
 </script>
 
