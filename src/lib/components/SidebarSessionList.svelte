@@ -44,7 +44,7 @@
 	);
 </script>
 
-<Sidebar.Header class="gap-3.5 border-b px-4">
+<Sidebar.Header class="gap-3.5 border-b px-4 py-3">
 	<div class="flex w-full items-center gap-3">
 		<div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/20">
 			<Icon icon={MessageMultiple02FreeIcons} class="size-4 text-primary" />

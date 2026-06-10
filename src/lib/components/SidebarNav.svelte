@@ -41,8 +41,13 @@
 								isActive={nav.current === item.id}
 								class="px-2.5 md:px-2"
 								onclick={() => {
+									const wasActive = nav.current === item.id;
 									nav.toggle(item.id);
-									sidebar.setOpen(true);
+									if (wasActive) {
+										sidebar.setOpen(false);
+									} else {
+										sidebar.setOpen(true);
+									}
 								}}
 							>
 								<Icon icon={item.icon} class="size-5" />

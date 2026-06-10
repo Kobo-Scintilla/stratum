@@ -14,14 +14,13 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
-		"@earendil-works/pi-agent-core": "^0.78.1",
 		"@earendil-works/pi-ai": "^0.78.1",
 		"@hugeicons/core-free-icons": "^4.2.0",
 		"@hugeicons/svelte": "^1.1.2",
 		"better-sqlite3": "^12.10.0",
 		"marked": "^18.0.5",
 		"svelte-persisted-state": "^1.4.1",
-		"typebox": "^1.2.1"
+		"svelte-sonner": "^1.1.1"
 	},
 	"devDependencies": {
 		"@fontsource-variable/outfit": "^5.2.8",
@@ -35,6 +34,7 @@
 		"bits-ui": "^2.18.1",
 		"clsx": "^2.1.1",
 		"fallow": "^2.88.1",
+		"mode-watcher": "^1.1.0",
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",

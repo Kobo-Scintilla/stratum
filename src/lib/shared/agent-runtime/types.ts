@@ -34,11 +34,11 @@ export interface TrackedToolCall {
 }
 
 /** Internal state for one ask() invocation. */
-export interface StreamState {
+interface StreamState {
 	accumulatedText: string;
 	lastWasTool: boolean;
 	toolCalls: TrackedToolCall[];
 	segments: ActiveStream['segments'];
 }
 
-export type { PiAiTool, Message, Model, Context };
+export type { PiAiTool, Message, Context };

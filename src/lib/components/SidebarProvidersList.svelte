@@ -2,8 +2,11 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { onMount } from 'svelte';
 	import { AgentService } from '$lib/shared/services/agent-service';
+	import { toggleProviderEnabled, setEnabledProviders } from '$lib/stores/providers-state.svelte.js';
+	import { scale } from 'svelte/transition';
 	import Icon from './Icon.svelte';
 	import Button from './ui/button/button.svelte';
+	import { createCachedQuery } from '$lib/shared/cached-query.svelte.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
@@ -21,19 +24,28 @@
 		ArrowDown01FreeIcons
 	} from '@hugeicons/core-free-icons';
 
-	let availableProviders = $state<
-		Array<{ id: string; envKeys: string[]; models: string[]; isCustom: boolean }>
-	>([]);
-	let apiKeys = $state<Record<string, string>>({});
-	let visibleKeys = $state<Record<string, boolean>>({});
+	// ── Cached queries (instant from cache, background refresh) ──
+	const providerInfoQuery = createCachedQuery(
+		'providerInfo',
+		() => AgentService.getProvidersInfo(),
+		{ persistence: 'local' }
+	);
+	const configuredQuery = createCachedQuery(
+		'configuredProviders',
+		() => AgentService.getConfiguredProviders(),
+		{ persistence: 'local' }
+	);
+
+	const availableProviders = $derived(providerInfoQuery.data);
+	const loading = $derived(providerInfoQuery.loading && configuredQuery.loading);
+
 	let configuredProviders = $state<Record<string, { enabled: boolean; hasKey: boolean; baseUrl?: string; apiType?: string; models?: string }>>({});
+	let apiKeys = $state<Record<string, string>>({});
 	let saving = $state<Record<string, boolean>>({});
 	let saved = $state<Record<string, boolean>>({});
-	let loading = $state(true);
 	let searchQuery = $state('');
 	let showDropdown = $state(false);
-
-	// Add custom provider form
+	let openCollapsibles = $state<Record<string, boolean>>({});
 	let addDialogOpen = $state(false);
 	let newProviderName = $state('');
 	let newProviderBaseUrl = $state('');
@@ -42,29 +54,36 @@
 	let newProviderModels = $state('');
 	let newProviderSaving = $state(false);
 
-	onMount(async () => {
-		await loadAll();
+	// Sync configured from query data
+	$effect(() => {
+		const configs = configuredQuery.data;
+		if (configs && configs.length > 0) {
+			configuredProviders = Object.fromEntries(
+				configs.map((c: { id: string; enabled: boolean; hasKey: boolean; baseUrl?: string; apiType?: string; models?: string }) => [
+					c.id,
+					{ enabled: c.enabled, hasKey: c.hasKey, baseUrl: c.baseUrl, apiType: c.apiType, models: c.models }
+				])
+			);
+		}
 	});
 
-	async function loadAll() {
-		try {
-			const [providers, configured, keys] = await Promise.all([
-				AgentService.getProvidersInfo(),
-				AgentService.getConfiguredProviders(),
-				AgentService.getProviderApiKeys()
-			]);
-			availableProviders = providers;
-			configuredProviders = Object.fromEntries(
-				configured.map((c) => [c.id, { enabled: c.enabled, hasKey: c.hasKey, baseUrl: c.baseUrl, apiType: c.apiType, models: c.models }])
-			);
-			apiKeys = keys;
-		} catch (err) {
-			console.error('Failed to load providers:', err);
-		} finally {
-			loading = false;
+	// Sync enabled providers for model selector — only from fresh data (not cache seed)
+	$effect(() => {
+		const configs = configuredQuery.data;
+		if (configs && configs.length > 0 && !configuredQuery.refreshing) {
+			setEnabledProviders(new Set(configs.filter((c: { enabled: boolean; hasKey: boolean }) => c.enabled && c.hasKey).map((c: { id: string }) => c.id)));
 		}
-	}
+	});
 
+	// Fetch API keys once on mount (not cached for security)
+	onMount(async () => {
+		try {
+			const keys = await AgentService.getProviderApiKeys();
+			apiKeys = Object.fromEntries(Object.entries(keys).map(([id]) => [id, '']));
+		} catch (err) {
+			console.error('Failed to load API keys:', err);
+		}
+	});
 	const filteredAvailable = $derived.by(() => {
 		if (!searchQuery.trim()) return [];
 		const q = searchQuery.toLowerCase();
@@ -108,22 +127,31 @@
 			...configuredProviders[providerId],
 			enabled
 		};
+		// Sync to shared state immediately for dashboard model selector
+		toggleProviderEnabled(providerId, enabled);
 		// Sync to DB if entry already persisted
 		if (configuredProviders[providerId]?.hasKey || configuredProviders[providerId]?.baseUrl) {
 			await AgentService.toggleProvider(providerId, enabled);
 		}
 	}
-
 	async function saveKey(providerId: string) {
+		const key = apiKeys[providerId]?.trim() || '';
+		if (!key && configuredProviders[providerId]?.hasKey) return;
+
 		saving[providerId] = true;
 		try {
-			await AgentService.saveProviderKey(providerId, apiKeys[providerId] || '');
+			await AgentService.saveProviderKey(providerId, key);
 			saved[providerId] = true;
 			configuredProviders[providerId] = {
 				...configuredProviders[providerId],
 				enabled: configuredProviders[providerId]?.enabled ?? true,
-				hasKey: !!apiKeys[providerId]
+				hasKey: !!key
 			};
+			// Sync to model selector — only if key was saved (provider now hasKey)
+			if (configuredProviders[providerId]?.enabled && !!key) {
+				toggleProviderEnabled(providerId, true);
+			}
+			apiKeys[providerId] = '';
 			setTimeout(() => {
 				saved[providerId] = false;
 			}, 2000);
@@ -136,12 +164,15 @@
 
 	async function removeProvider(providerId: string) {
 		delete configuredProviders[providerId];
+		// Remove from model selector immediately
+		toggleProviderEnabled(providerId, false);
 		try {
 			await AgentService.deleteProviderKey(providerId);
 		} catch (err) {
 			console.error('Failed to remove provider:', err);
 		}
 	}
+
 
 
 	async function addCustomProvider() {
@@ -161,7 +192,7 @@
 			);
 			addDialogOpen = false;
 			resetForm();
-			await loadAll();
+			await Promise.all([providerInfoQuery.refresh(), configuredQuery.refresh()]);
 		} catch (err) {
 			console.error('Failed to add provider:', err);
 		} finally {
@@ -195,11 +226,15 @@
 		if (!item.enabled) return 'Disabled';
 		return 'Active';
 	}
-
-	function onSearchBlur() {
-		setTimeout(() => {
-			showDropdown = false;
-		}, 200);
+	function onSearchBlur(e: FocusEvent) {
+		const related = e.relatedTarget as Node | null;
+		const dropdownEl = (e.currentTarget as HTMLElement)
+			.closest('.relative')
+			?.querySelector('[data-dropdown]');
+		if (dropdownEl && related && dropdownEl.contains(related)) {
+			return;
+		}
+		showDropdown = false;
 	}
 </script>
 
@@ -239,7 +274,9 @@
 				<!-- Dropdown -->
 				{#if showDropdown && searchQuery.trim()}
 					<div
-						class="absolute z-10 mt-1 w-full rounded-xl border border-border/40 bg-popover p-1 shadow-lg"
+						transition:scale={{ start: 0.95, duration: 150, opacity: 0 }}
+						class="absolute z-10 mt-1 w-full rounded-xl border border-border/40 bg-popover p-1 shadow-lg origin-top"
+						data-dropdown
 					>
 						<div class="no-scrollbar max-h-48 overflow-y-auto">
 							{#if filteredAvailable.length > 0}
@@ -347,7 +384,11 @@
 			{#if configuredList.length > 0}
 				<div class="flex flex-col gap-1">
 					{#each configuredList as item (item.id)}
-						<Collapsible.Root class="overflow-hidden rounded-xl border border-border/40 bg-card/20">
+						<Collapsible.Root
+							open={openCollapsibles[item.id] ?? false}
+							onOpenChange={(v: boolean) => (openCollapsibles[item.id] = v)}
+							class="overflow-hidden rounded-xl border border-border/40 bg-card/20"
+						>
 							<Collapsible.Trigger class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-accent/50 transition-colors outline-none">
 								<div class="flex items-center gap-2 min-w-0">
 									<span
@@ -360,27 +401,14 @@
 								<Icon icon={ArrowDown01FreeIcons} class="size-3 text-muted-foreground/60 transition-transform ui-open:rotate-180" />
 							</Collapsible.Trigger>
 							<Collapsible.Content>
-								<div class="flex flex-col gap-2 pt-1">
-									<!-- API Key -->
-									<div class="relative">
-										<Input
-											type={visibleKeys[item.id] ? 'text' : 'password'}
-											placeholder="Enter API key"
-											bind:value={apiKeys[item.id]}
-											class="pr-10 text-xs"
-										/>
-										<button
-											type="button"
-											class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground/70 hover:text-foreground"
-											onclick={() => (visibleKeys[item.id] = !visibleKeys[item.id])}
-										>
-											{#if visibleKeys[item.id]}
-												<Icon icon={ViewOffFreeIcons} class="size-3.5" />
-											{:else}
-												<Icon icon={ViewFreeIcons} class="size-3.5" />
-											{/if}
-										</button>
-									</div>
+								<div class="flex flex-col gap-2 px-3 pb-3 pt-1">
+									<!-- API Key — never shows existing key -->
+									<Input
+										type="password"
+										placeholder={item.hasKey ? 'Key saved — type to replace' : 'Enter API key'}
+										bind:value={apiKeys[item.id]}
+										class="text-xs"
+									/>
 
 									<!-- Custom provider details -->
 									{#if item.baseUrl}
@@ -398,17 +426,16 @@
 										</div>
 									{/if}
 
-									<!-- Enable/Disable Switch -->
-									<div class="flex items-center justify-between">
-										<span class="text-xs text-muted-foreground">Enable provider</span>
-										<Switch
-											checked={item.enabled}
-											onCheckedChange={(v: boolean) => toggleProvider(item.id, v)}
-										/>
-									</div>
-
-									<!-- Actions row -->
-									<div class="flex items-center justify-between pt-0.5">
+									<!-- Enable + Save row -->
+									<div class="flex items-center gap-3 pt-1">
+										<div class="flex items-center gap-2">
+											<Switch
+												checked={item.enabled}
+												onCheckedChange={(v: boolean) => toggleProvider(item.id, v)}
+											/>
+											<span class="text-xs text-muted-foreground">{item.enabled ? 'Enabled' : 'Disabled'}</span>
+										</div>
+										<div class="flex-1"></div>
 										{#if item.baseUrl}
 											<button
 												type="button"
@@ -418,8 +445,6 @@
 												<Icon icon={Delete02FreeIcons} class="size-3" />
 												Remove
 											</button>
-										{:else}
-											<div></div>
 										{/if}
 										<Button
 											size="sm"
@@ -432,7 +457,7 @@
 											{:else}
 												<div class="flex items-center gap-1">
 													{#if saved[item.id]}
-														<Icon icon={CheckmarkCircle01FreeIcons} class="size-3 text-primary-foreground" />
+														<Icon icon={CheckmarkCircle01FreeIcons} class="size-3" />
 														Saved
 													{:else}
 														<Icon icon={LockKeyFreeIcons} class="size-3" />

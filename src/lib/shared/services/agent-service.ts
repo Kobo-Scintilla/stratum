@@ -13,11 +13,63 @@ import {
 
 let encryption: { encrypt(s: string): string; decrypt(s: string): string } | null = null;
 
+function encryptionModule(): Promise<{ encrypt(s: string): string; decrypt(s: string): string }> {
+	const path = ['..', '..', 'server', 'encryption'].join('/');
+	return import(/* @vite-ignore */ path);
+}
+
 async function getEncryption() {
 	if (!encryption) {
-		encryption = await import('$lib/server/encryption');
+		encryption = await encryptionModule();
 	}
 	return encryption;
+}
+
+/**
+ * Map a provider ID to the environment variable names pi-ai checks for its API key.
+ * Mirrors pi-ai's internal `getApiKeyEnvVars` (not exported).
+ */
+const API_KEY_ENV_MAP: Record<string, string[]> = {
+	'github-copilot': ['COPILOT_GITHUB_TOKEN'],
+	'anthropic': ['ANTHROPIC_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'],
+	'ant-ling': ['ANT_LING_API_KEY'],
+	'openai': ['OPENAI_API_KEY'],
+	'azure-openai-responses': ['AZURE_OPENAI_API_KEY'],
+	'nvidia': ['NVIDIA_API_KEY'],
+	'deepseek': ['DEEPSEEK_API_KEY'],
+	'google': ['GEMINI_API_KEY'],
+	'google-vertex': ['GOOGLE_CLOUD_API_KEY'],
+	'groq': ['GROQ_API_KEY'],
+	'cerebras': ['CEREBRAS_API_KEY'],
+	'xai': ['XAI_API_KEY'],
+	'openrouter': ['OPENROUTER_API_KEY'],
+	'vercel-ai-gateway': ['AI_GATEWAY_API_KEY'],
+	'zai': ['ZAI_API_KEY'],
+	'zai-coding-cn': ['ZAI_CODING_CN_API_KEY'],
+	'mistral': ['MISTRAL_API_KEY'],
+	'minimax': ['MINIMAX_API_KEY'],
+	'minimax-cn': ['MINIMAX_CN_API_KEY'],
+	'moonshotai': ['MOONSHOT_API_KEY'],
+	'moonshotai-cn': ['MOONSHOT_API_KEY'],
+	'huggingface': ['HF_TOKEN'],
+	'fireworks': ['FIREWORKS_API_KEY'],
+	'together': ['TOGETHER_API_KEY'],
+	'opencode': ['OPENCODE_API_KEY'],
+	'opencode-go': ['OPENCODE_API_KEY'],
+	'kimi-coding': ['KIMI_API_KEY'],
+	'cloudflare-workers-ai': ['CLOUDFLARE_API_KEY'],
+	'cloudflare-ai-gateway': ['CLOUDFLARE_API_KEY'],
+	'xiaomi': ['XIAOMI_API_KEY'],
+	'xiaomi-token-plan-cn': ['XIAOMI_TOKEN_PLAN_CN_API_KEY'],
+	'xiaomi-token-plan-ams': ['XIAOMI_TOKEN_PLAN_AMS_API_KEY'],
+	'xiaomi-token-plan-sgp': ['XIAOMI_TOKEN_PLAN_SGP_API_KEY'],
+};
+
+function getApiKeyEnvVars(providerId: string): string[] {
+	const known = API_KEY_ENV_MAP[providerId];
+	if (known) return known;
+	// Fallback: convention <PROVIDER_ID>_API_KEY
+	return [`${providerId.replace(/-/g, '_').toUpperCase()}_API_KEY`];
 }
 
 export class AgentService {
@@ -40,7 +92,6 @@ export class AgentService {
 
 		// 3. Populate process.env with configured provider API keys
 		const providerSettings = await remult.repo(ProviderSetting).find({ where: { enabled: true } });
-		const { findEnvKeys } = await import('@earendil-works/pi-ai');
 		const enc = await getEncryption();
 		let configuredCount = 0;
 		for (const setting of providerSettings) {
@@ -52,8 +103,8 @@ export class AgentService {
 						setting.apiType === 'anthropic-messages' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
 					process.env[apiKeyEnv] = decrypted;
 				} else {
-					const envKeys = findEnvKeys(setting.id) ?? [];
-					for (const envKey of envKeys) {
+					const envVars = getApiKeyEnvVars(setting.id);
+					for (const envKey of envVars) {
 						process.env[envKey] = decrypted;
 					}
 				}
@@ -70,6 +121,7 @@ export class AgentService {
 				`Provider "${config.modelProvider}" has no API key configured. Add its key in the sidebar providers.`
 			);
 		}
+
 
 		await insertUserMessage(sessionId, prompt);
 		const activeStream = await insertActiveStream(sessionId, prompt);

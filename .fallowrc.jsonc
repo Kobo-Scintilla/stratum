@@ -3,8 +3,10 @@
 	// SvelteKit plugin auto-detects routes, layouts, hooks.
 	// No manual entry points needed.
 	"entry": [],
+	"ignorePatterns": [
+		"src/lib/components/ui/**"
+	],
 	// Suppress unused-re-export noise from shadcn barrel files.
-	// These export many short names that get used as the app grows.
 	"ignoreExports": [
 		{
 			"file": "src/lib/components/ui/sidebar/index.ts",

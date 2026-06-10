@@ -47,7 +47,7 @@ function genId(): string {
 	return crypto.randomUUID();
 }
 
-export async function withOwnContext<T>(fn: () => Promise<T>): Promise<T> {
+async function withOwnContext<T>(fn: () => Promise<T>): Promise<T> {
 	if (globalThis.remultApi) {
 		return await (
 			globalThis.remultApi.withRemult as (ctx: undefined, fn: () => Promise<T>) => Promise<T>
@@ -56,7 +56,7 @@ export async function withOwnContext<T>(fn: () => Promise<T>): Promise<T> {
 	return await fn();
 }
 
-export async function updateActiveStream(
+async function updateActiveStream(
 	stream: ActiveStream,
 	text: string,
 	toolCalls: ActiveStream['toolCalls'],
@@ -69,7 +69,7 @@ export async function updateActiveStream(
 	});
 }
 
-export async function insertAssistantMessage(
+async function insertAssistantMessage(
 	sessionId: string,
 	text: string,
 	toolCalls: TrackedToolCall[],
@@ -253,9 +253,16 @@ export async function runStreamLoop(
 				case 'done':
 					handleDone(event, state, context);
 					break;
-				case 'error':
-					console.error('[stream] stream error:', event.error);
-					break;
+			case 'error':
+				console.error('[stream] stream error:', event.error);
+				// Surface error message in stream text so UI can display it
+				await updateActiveStream(
+					stream,
+					`> **Error:** ${event.error?.errorMessage || 'Unknown stream error'}`,
+					[],
+					[{ type: 'text', text: `Error: ${event.error?.errorMessage || 'Unknown stream error'}` }]
+				);
+				break;
 			}
 		}
 

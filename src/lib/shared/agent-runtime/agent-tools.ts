@@ -5,7 +5,7 @@ import { getTimeTool } from './tools/get-time';
 
 export type { ToolDefinition, ToolResult };
 
-export class ToolRegistry {
+class ToolRegistry {
 	private tools = new Map<string, ToolDefinition>();
 
 	register(tool: ToolDefinition): void {

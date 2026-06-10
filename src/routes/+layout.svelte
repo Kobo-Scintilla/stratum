@@ -1,5 +1,6 @@
 <script lang="ts">
 	import './layout.css';
+	import { Toaster } from '$lib/components/ui/sonner/index.js';
 	import { remult, Remult } from 'remult';
 	import { createSubscriber } from 'svelte/reactivity';
 	import { createNavState } from '$lib/stores/nav-state.svelte.js';
@@ -27,5 +28,7 @@
 		};
 	}
 </script>
+
+<Toaster />
 
 {@render children()}

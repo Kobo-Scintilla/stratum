@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { getChatSession, type ChatSession } from '$lib/stores/chat-session.svelte.js';
 	import * as ScrollArea from '$lib/components/ui/scroll-area/index.js';
@@ -8,8 +9,9 @@
 	import { remult } from 'remult';
 	import { ChatSessionSettings } from '$lib/shared/entities/chat-session-settings';
 	import { AgentService } from '$lib/shared/services/agent-service';
-	import * as Popover from '$lib/components/ui/popover/index.js';
+	import { getEnabledProviders, setEnabledProviders } from '$lib/stores/providers-state.svelte.js';
 	import * as Command from '$lib/components/ui/command/index.js';
+	import * as Popover from '$lib/components/ui/popover/index.js';
 
 	import EmptyState from '$lib/components/chat/EmptyState.svelte';
 	import ChatMessage from '$lib/components/chat/ChatMessage.svelte';
@@ -21,7 +23,24 @@
 	let enabledProviders = $state<Set<string>>(new Set());
 	let sessionSettings = $state<ChatSessionSettings | null>(null);
 	let modelSwitcherOpen = $state(false);
-let pendingModel = $state<{ provider: string; model: string } | null>(null);
+	let pendingModel = $state<{ provider: string; model: string } | null>(null);
+
+	// Sync from shared store when sidebar toggles providers
+	$effect(() => {
+		enabledProviders = getEnabledProviders();
+	});
+
+	// Clear model selection if its provider gets disabled
+	$effect(() => {
+		const enabled = getEnabledProviders();
+		if (sessionSettings?.modelProvider && sessionSettings.modelId && !enabled.has(sessionSettings.modelProvider)) {
+			if (sessionId) {
+				updateSettings({ modelProvider: '', modelId: '' });
+			} else {
+				pendingModel = null;
+			}
+		}
+	});
 
 	onMount(async () => {
 		const [providers, configured] = await Promise.all([
@@ -29,15 +48,23 @@ let pendingModel = $state<{ provider: string; model: string } | null>(null);
 			AgentService.getConfiguredProviders()
 		]);
 		providerInfo = providers;
-		// Only show providers that are enabled AND have API keys
-		const enabled = new Set(
+		setEnabledProviders(new Set(
 			configured.filter((c) => c.enabled && c.hasKey).map((c) => c.id)
-		);
-		enabledProviders = enabled;
+		));
 	});
 	let sessionId = $derived($page.params.sessionId);
 	// svelte-ignore state_referenced_locally
 	let chat: ChatSession = getChatSession(sessionId, $page.data.messages);
+	// Show toast on chat errors
+	$effect(() => {
+		if (chat.error) {
+			toast.error(chat.error, {
+				description: 'Fix the issue and try again.',
+				duration: 8000
+			});
+		}
+	});
+
 	let viewport: HTMLElement | null = $state(null);
 	let lastScrollHeight = 0;
 
@@ -230,77 +257,47 @@ let pendingModel = $state<{ provider: string; model: string } | null>(null);
 	<div class="sticky bottom-0 border-t border-border/25 bg-background">
 		<ChatInput disabled={chat.isSending || !modelReady} error={!hasActiveProviders ? 'Configure a provider with an API key in the sidebar to start.' : !modelReady ? 'Select a model above to start.' : chat.error} onsend={handleSend} />
 
-		{#if sessionId}
-			<div class="mx-auto flex max-w-2xl items-center justify-end px-4 pb-2 pt-1">
-				<Popover.Root bind:open={modelSwitcherOpen}>
-					<Popover.Trigger>
-						<button
-							type="button"
-							class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-						>
-							<span>{currentModelLabel}</span>
-							<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-								<path d="M6 9l6 6 6-6" />
-							</svg>
-						</button>
-					</Popover.Trigger>
-					<Popover.Content side="top" sideOffset={6} align="end" class="w-80 p-0">
-						<Command.Root value={activeValue}>
-							<Command.Input placeholder="Search models..." />
-							<Command.List class="max-h-[min(60vh,28rem)]">
-								<Command.Empty>{enabledProviders.size === 0 ? 'No providers configured — open the sidebar to add one.' : 'No model found.'}</Command.Empty>
-								{#each modelGroups as group}
-									<Command.Group heading={group.provider}>
-										{#each group.models as m}
-											<Command.Item
-												value={m.value}
-												class="content-visibility-auto"
-												onclick={() => onModelSelect(m.value)}
-											>
-												<span class="text-[11px] font-mono text-muted-foreground shrink-0 w-24 truncate">{m.provider}</span>
-												<span class="truncate text-xs">{m.label}</span>
-											</Command.Item>
-										{/each}
-									</Command.Group>
-								{/each}
-							</Command.List>
-						</Command.Root>
-					</Popover.Content>
-				</Popover.Root>
-			</div>
-		{:else if hasActiveProviders}
-			<div class="mx-auto flex max-w-2xl items-center justify-end px-4 pb-2 pt-1">
-				<div class="relative">
+		{#snippet modelSelector()}
+			<Popover.Root bind:open={modelSwitcherOpen}>
+				<Popover.Trigger>
 					<button
-					type="button"
-					class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-					onclick={() => (modelSwitcherOpen = !modelSwitcherOpen)}
-				>
-					<span>{currentModelLabel}</span>
-					<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M6 9l6 6 6-6" />
-					</svg>
-				</button>
-				{#if modelSwitcherOpen}
-					<div class="absolute bottom-full right-0 z-10 mb-1 w-80 rounded-xl border border-border/40 bg-popover p-1 shadow-lg">
-						<div class="no-scrollbar max-h-72 overflow-y-auto">
+						type="button"
+						class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+					>
+						<span>{currentModelLabel}</span>
+						<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M6 9l6 6 6-6" />
+						</svg>
+					</button>
+				</Popover.Trigger>
+				<Popover.Content side="top" sideOffset={6} align="end" class="w-80 p-0">
+					<Command.Root value={activeValue}>
+						<Command.Input placeholder="Search models..." />
+						<Command.List class="max-h-[min(60vh,28rem)]">
+							<Command.Empty>{enabledProviders.size === 0 ? 'No providers configured — open the sidebar to add one.' : 'No model found.'}</Command.Empty>
 							{#each modelGroups as group}
-							<div class="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.provider}</div>
-							{#each group.models as m}
-								<button
-									type="button"
-									class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-accent/50 transition-colors"
-									onclick={() => { onModelSelect(m.value); modelSwitcherOpen = false; }}
-								>
-									<span class="w-24 shrink-0 truncate font-mono text-[11px] text-muted-foreground">{m.provider}</span>
-									<span class="truncate">{m.label}</span>
-								</button>
+								<Command.Group heading={group.provider}>
+									{#each group.models as m}
+										<Command.Item
+											value={m.value}
+											class="content-visibility-auto"
+											onclick={() => onModelSelect(m.value)}
+										>
+											<span class="text-[11px] font-mono text-muted-foreground shrink-0 w-24 truncate">{m.provider}</span>
+											<span class="truncate text-xs">{m.label}</span>
+										</Command.Item>
+									{/each}
+								</Command.Group>
 							{/each}
-							{/each}
-						</div>
-					</div>
-					{/if}
-				</div>
+						</Command.List>
+					</Command.Root>
+				</Popover.Content>
+			</Popover.Root>
+		{/snippet}
+
+		{#if (sessionId && sessionSettings) || (!sessionId && hasActiveProviders)}
+			<div class="mx-auto flex max-w-2xl items-center justify-end px-4 pb-2 pt-1">
+				{@render modelSelector()}
 			</div>
 		{/if}
 	</div>
