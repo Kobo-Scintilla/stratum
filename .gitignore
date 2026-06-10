@@ -1,0 +1,27 @@
+/node_modules
+/.turbo
+/build
+/dist
+/.svelte-kit
+.pnpm-store
+
+# Database
+db.sqlite
+db.sqlite-shm
+db.sqlite-wal
+
+# Encryption
+.encryption-key
+
+# Env
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

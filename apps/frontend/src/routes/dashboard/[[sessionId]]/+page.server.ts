@@ -1,5 +1,5 @@
 import { remult } from 'remult';
-import { ChatMessage } from '$lib/shared/entities/chat-message';
+import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
 
 export async function load({ params }) {
 	const sessionId = params.sessionId;

@@ -4,24 +4,20 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "tsx watch src/index.ts",
-		"build": "tsc",
-		"start": "node dist/index.js",
+		"dev": "bun --watch src/index.ts",
+		"start": "bun src/index.ts",
 		"check": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@opaius/shared": "workspace:*",
 		"@earendil-works/pi-ai": "^0.78.1",
-		"better-sqlite3": "^12.10.0",
 		"hono": "^4.7.0",
 		"@hono/node-server": "^1.14.0",
 		"remult": "^3.3.12",
 		"headroom-ai": "^0.22.4"
 	},
 	"devDependencies": {
-		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^25.9.1",
-		"tsx": "^4.19.0",
 		"typescript": "^6.0.2"
 	}
 }

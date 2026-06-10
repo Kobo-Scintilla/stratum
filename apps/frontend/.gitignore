@@ -1,3 +1,5 @@
+# Root monorepo
+/node_modules
 node_modules
 
 # Output

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { createQuery } from '$lib/stores/create-query.svelte.js';
-	import { AgentService } from '$lib/shared/services/agent-service';
 	import {
 		Loading02FreeIcons,
 		MessageMultiple02FreeIcons,
@@ -15,7 +14,7 @@
 	import { getChatSession } from '$lib/stores/chat-session.svelte.js';
 
 	const sessions = createQuery<{ sessionId: string; createdAt: string; preview: string }[]>(
-		() => AgentService.listSessions(),
+		() => fetch('http://localhost:3001/api/listSessions').then(r => r.json()),
 		$page.data.sessions ?? []
 	);
 	const chat = getChatSession();

@@ -1,6 +1,7 @@
-import { AgentService } from '$lib/shared/services/agent-service';
+import { remult } from 'remult';
 
 export async function load() {
-	const sessions = await AgentService.listSessions();
+	const res = await fetch('http://localhost:3001/api/listSessions');
+	const sessions = await res.json();
 	return { sessions };
 }

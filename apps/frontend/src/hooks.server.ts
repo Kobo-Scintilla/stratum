@@ -1,13 +1,11 @@
-import { sequence } from '@sveltejs/kit/hooks';
 import { env } from '$env/dynamic/private';
-import { api as handleRemult } from '$lib/server/api';
+import { remult } from 'remult';
 import fs from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
 
 // ── Bootstrap encryption key ────────────────────────────────────
 if (!env.ENCRYPTION_KEY) {
-	const keyFile = path.resolve('.encryption-key');
+	const keyFile = './.encryption-key';
 	let key: string;
 	if (fs.existsSync(keyFile)) {
 		key = fs.readFileSync(keyFile, 'utf8').trim();
@@ -19,4 +17,9 @@ if (!env.ENCRYPTION_KEY) {
 	process.env.ENCRYPTION_KEY = key;
 }
 
-export const handle = sequence(handleRemult);
+// Point Remult client to gateway for SSR
+remult.apiClient.url = 'http://localhost:3001/api';
+
+export const handle = async ({ event, resolve }) => {
+	return await resolve(event);
+};

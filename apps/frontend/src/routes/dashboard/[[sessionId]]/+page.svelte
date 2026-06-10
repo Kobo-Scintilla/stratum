@@ -8,7 +8,6 @@
 	import { tick, onMount } from 'svelte';
 	import { remult } from 'remult';
 	import { ChatSessionSettings } from '$lib/shared/entities/chat-session-settings';
-	import { AgentService } from '$lib/shared/services/agent-service';
 	import { getEnabledProviders, setEnabledProviders } from '$lib/stores/providers-state.svelte.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
@@ -43,15 +42,16 @@
 	});
 
 	onMount(async () => {
-		const [providers, configured] = await Promise.all([
-			AgentService.getProvidersInfo(),
-			AgentService.getConfiguredProviders()
+		const [providers, configured]: [any, any] = await Promise.all([
+			fetch('http://localhost:3001/api/getProvidersInfo', { method: 'POST' }).then(r => r.json()),
+			fetch('http://localhost:3001/api/getConfiguredProviders', { method: 'POST' }).then(r => r.json())
 		]);
-		providerInfo = providers;
+		providerInfo = providers as Array<{ id: string; envKeys: string[]; models: string[]; isCustom: boolean }>;
 		setEnabledProviders(new Set(
-			configured.filter((c) => c.enabled && c.hasKey).map((c) => c.id)
+			(configured as Array<{ id: string; enabled: boolean; hasKey: boolean }>).filter((c) => c.enabled && c.hasKey).map((c) => c.id)
 		));
 	});
+
 	let sessionId = $derived($page.params.sessionId);
 	// svelte-ignore state_referenced_locally
 	let chat: ChatSession = getChatSession(sessionId, $page.data.messages);

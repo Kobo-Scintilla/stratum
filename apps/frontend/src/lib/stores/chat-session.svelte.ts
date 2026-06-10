@@ -1,6 +1,5 @@
 import { browser } from '$app/environment';
 import { remult } from 'remult';
-import { AgentService } from '../shared/services/agent-service';
 import { ChatMessage } from '../shared/entities/chat-message';
 import { ActiveStream } from '../shared/entities/active-stream';
 import type { ToolCallInfo } from '../shared/entities/chat-message';
@@ -103,7 +102,7 @@ export function createChatSession(
 		unsubs = [];
 
 		// Run in background without blocking subscription to prevent UI lag/flicker
-		AgentService.recoverMessages(sid).catch(() => {});
+		remult.repo(ChatMessage).count({ sessionId: sid }).catch(() => {});
 
 		unsubs.push(
 			remult
@@ -193,7 +192,15 @@ export function createChatSession(
 			isSending = true;
 			error = '';
 			try {
-				await AgentService.ask(prompt, sid);
+				const res = await fetch('http://localhost:3001/api/ask', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ prompt, sessionId: sid })
+				});
+				if (!res.ok) {
+					const err = await res.text();
+					throw new Error(err);
+				}
 			} catch (err: unknown) {
 				error = err instanceof Error ? err.message : String(err);
 			} finally {

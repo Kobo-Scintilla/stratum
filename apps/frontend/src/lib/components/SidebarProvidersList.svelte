@@ -1,7 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { onMount } from 'svelte';
-	import { AgentService } from '$lib/shared/services/agent-service';
 	import { toggleProviderEnabled, setEnabledProviders } from '$lib/stores/providers-state.svelte.js';
 	import { scale } from 'svelte/transition';
 	import Icon from './Icon.svelte';
@@ -27,16 +26,16 @@
 	// ── Cached queries (instant from cache, background refresh) ──
 	const providerInfoQuery = createCachedQuery(
 		'providerInfo',
-		() => AgentService.getProvidersInfo(),
+		() => fetch('http://localhost:3001/api/getProvidersInfo', { method: 'POST' }).then(r => r.json()),
 		{ persistence: 'local' }
 	);
 	const configuredQuery = createCachedQuery(
 		'configuredProviders',
-		() => AgentService.getConfiguredProviders(),
+		() => fetch('http://localhost:3001/api/getConfiguredProviders', { method: 'POST' }).then(r => r.json()),
 		{ persistence: 'local' }
 	);
 
-	const availableProviders = $derived(providerInfoQuery.data);
+	const availableProviders = $derived(providerInfoQuery.data as Array<{ id: string; envKeys: string[]; models: string[]; isCustom: boolean }> | null);
 	const loading = $derived(providerInfoQuery.loading && configuredQuery.loading);
 
 	let configuredProviders = $state<Record<string, { enabled: boolean; hasKey: boolean; baseUrl?: string; apiType?: string; models?: string }>>({});
@@ -78,7 +77,7 @@
 	// Fetch API keys once on mount (not cached for security)
 	onMount(async () => {
 		try {
-			const keys = await AgentService.getProviderApiKeys();
+			const keys = await fetch('http://localhost:3001/api/getProviderApiKeys', { method: 'POST' }).then(r => r.json());
 			apiKeys = Object.fromEntries(Object.entries(keys).map(([id]) => [id, '']));
 		} catch (err) {
 			console.error('Failed to load API keys:', err);
@@ -87,7 +86,7 @@
 	const filteredAvailable = $derived.by(() => {
 		if (!searchQuery.trim()) return [];
 		const q = searchQuery.toLowerCase();
-		return availableProviders.filter(
+		return (availableProviders ?? []).filter(
 			(p) =>
 				p.id.toLowerCase().includes(q) ||
 				p.models.some((m) => m.toLowerCase().includes(q))
@@ -102,7 +101,7 @@
 				enabled: cfg.enabled,
 				hasKey: cfg.hasKey,
 				baseUrl: cfg.baseUrl,
-				info: availableProviders.find((p) => p.id === id) ?? {
+				info: (availableProviders ?? []).find((p) => p.id === id) ?? {
 					id,
 					envKeys: [],
 					models: [],
@@ -131,7 +130,7 @@
 		toggleProviderEnabled(providerId, enabled);
 		// Sync to DB if entry already persisted
 		if (configuredProviders[providerId]?.hasKey || configuredProviders[providerId]?.baseUrl) {
-			await AgentService.toggleProvider(providerId, enabled);
+			await fetch('http://localhost:3001/api/toggleProvider', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId, enabled }) });
 		}
 	}
 	async function saveKey(providerId: string) {
@@ -140,7 +139,7 @@
 
 		saving[providerId] = true;
 		try {
-			await AgentService.saveProviderKey(providerId, key);
+			await fetch('http://localhost:3001/api/saveProviderKey', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId, apiKey: key }) });
 			saved[providerId] = true;
 			configuredProviders[providerId] = {
 				...configuredProviders[providerId],
@@ -167,7 +166,7 @@
 		// Remove from model selector immediately
 		toggleProviderEnabled(providerId, false);
 		try {
-			await AgentService.deleteProviderKey(providerId);
+			await fetch('http://localhost:3001/api/deleteProviderKey', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId }) });
 		} catch (err) {
 			console.error('Failed to remove provider:', err);
 		}
@@ -183,13 +182,17 @@
 				.split(',')
 				.map((m) => m.trim())
 				.filter(Boolean);
-			await AgentService.saveCustomProvider(
-				newProviderName.trim(),
-				newProviderApiKey,
-				newProviderBaseUrl.trim(),
-				newProviderApiType,
-				models
-			);
+			await fetch('http://localhost:3001/api/saveCustomProvider', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					providerId: newProviderName.trim(),
+					apiKey: newProviderApiKey,
+					baseUrl: newProviderBaseUrl.trim(),
+					apiType: newProviderApiType,
+					models
+				})
+			});
 			addDialogOpen = false;
 			resetForm();
 			await Promise.all([providerInfoQuery.refresh(), configuredQuery.refresh()]);
