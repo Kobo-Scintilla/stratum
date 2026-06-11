@@ -1,46 +1,52 @@
-import { Entity, Fields } from 'remult';
+import { Entity, Fields } from "remult";
 
-@Entity('activeStreams', {
-	allowApiCrud: true
+@Entity("activeStreams", {
+  allowApiCrud: true,
 })
 export class ActiveStream {
-	@Fields.id()
-	id!: string;
+  @Fields.id()
+  id!: string;
 
-	@Fields.string()
-	sessionId = 'default';
+  @Fields.string()
+  sessionId = "default";
 
-	@Fields.string()
-	prompt = '';
+  @Fields.string()
+  prompt = "";
 
-	@Fields.string()
-	text = '';
+  @Fields.string()
+  text = "";
 
-	@Fields.boolean()
-	isGenerating = true;
+  @Fields.boolean()
+  isGenerating = true;
 
-	@Fields.date()
-	createdAt = new Date();
+  @Fields.date()
+  createdAt = new Date();
 
-	@Fields.json()
-	toolCalls: Array<{
-		id: string;
-		name: string;
-		args: unknown;
-		result?: unknown;
-		isError?: boolean;
-	}> = [];
+  @Fields.json()
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    args: unknown;
+    result?: unknown;
+    isError?: boolean;
+  }> = [];
 
-	@Fields.json()
-	segments: Array<
-		| { type: 'text'; text: string }
-		| {
-				type: 'tool';
-				toolCallId: string;
-				toolName: string;
-				args: unknown;
-				result?: unknown;
-				isError?: boolean;
-		  }
-	> = [];
+  @Fields.json()
+  segments: Array<
+    | { type: "text"; text: string }
+    | {
+        type: "tool";
+        toolCallId: string;
+        toolName: string;
+        args: unknown;
+        result?: unknown;
+        isError?: boolean;
+      }
+  > = [];
+
+  @Fields.integer()
+  headroomTokensSaved = 0;
+
+  @Fields.number()
+  headroomRatio = 1;
 }

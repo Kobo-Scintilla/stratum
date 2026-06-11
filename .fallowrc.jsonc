@@ -1,28 +1,26 @@
 {
-	"$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-	// SvelteKit plugin auto-detects routes, layouts, hooks.
-	// No manual entry points needed.
-	"entry": [],
-	"ignorePatterns": [
-		"src/lib/components/ui/**"
-	],
-	// Suppress unused-re-export noise from shadcn barrel files.
-	"ignoreExports": [
-		{
-			"file": "src/lib/components/ui/sidebar/index.ts",
-			"exports": ["*"]
-		}
-	],
-	"duplicates": {
-		"minOccurrences": 3,
-		"ignoreDefaults": true
-	},
-	"rules": {},
-	"health": {
-		"maxCyclomatic": 20,
-		"maxCognitive": 15
-	},
-	"audit": {
-		"gate": "new-only"
-	}
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  // SvelteKit plugin auto-detects routes, layouts, hooks.
+  // No manual entry points needed.
+  "entry": [],
+  "ignorePatterns": ["src/lib/components/ui/**"],
+  // Suppress unused-re-export noise from shadcn barrel files.
+  "ignoreExports": [
+    {
+      "file": "src/lib/components/ui/sidebar/index.ts",
+      "exports": ["*"],
+    },
+  ],
+  "duplicates": {
+    "minOccurrences": 3,
+    "ignoreDefaults": true,
+  },
+  "rules": {},
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+  },
+  "audit": {
+    "gate": "new-only",
+  },
 }

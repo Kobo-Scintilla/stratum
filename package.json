@@ -1,24 +1,24 @@
 {
-	"name": "opaius",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "turbo run dev",
-		"build": "turbo run build",
-		"check": "turbo run check",
-		"lint": "turbo run lint",
-		"format": "prettier --write ."
-	},
-	"devDependencies": {
-		"prettier": "^3.8.1",
-		"prettier-plugin-svelte": "^3.5.1",
-		"prettier-plugin-tailwindcss": "^0.7.2",
-		"turbo": "^2.9.0",
-		"typescript": "^6.0.2"
-	},
-	"packageManager": "bun@1.2.0",
-	"workspaces": [
-		"apps/*",
-		"packages/*"
-	]
+  "name": "opaius",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "check": "turbo run check",
+    "lint": "turbo run lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1",
+    "prettier-plugin-svelte": "^3.5.1",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "turbo": "^2.9.0",
+    "typescript": "^6.0.2"
+  },
+  "packageManager": "bun@1.2.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

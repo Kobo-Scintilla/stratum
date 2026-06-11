@@ -44,7 +44,9 @@ function saveToCache<T>(key: string, data: T, p: Persistence, ttl: number) {
 	try {
 		const expires = ttl ? Date.now() + ttl : 0;
 		s.setItem('cq:' + key, JSON.stringify({ data, expires }));
-	} catch { /* quota */ }
+	} catch {
+		/* quota */
+	}
 }
 
 class CachedQueryInstance<T> implements CachedQuery<T> {

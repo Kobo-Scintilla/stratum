@@ -1,6 +1,9 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { toggleProviderEnabled, setEnabledProviders } from '$lib/stores/providers-state.svelte.js';
+	import {
+		toggleProviderEnabled,
+		setEnabledProviders
+	} from '$lib/stores/providers-state.svelte.js';
 	import { createCachedQuery } from '$lib/utils/cached-query.svelte.js';
 	import { remult } from 'remult';
 	import { AgentService } from '@opaius/shared/controllers/agent-service.js';
@@ -40,7 +43,10 @@
 	);
 	const configuredQuery = createCachedQuery<ConfiguredProviderDto[] | undefined>(
 		'configuredProviders',
-		() => remult.call(AgentService.getConfiguredProviders, undefined) as Promise<ConfiguredProviderDto[]>,
+		() =>
+			remult.call(AgentService.getConfiguredProviders, undefined) as Promise<
+				ConfiguredProviderDto[]
+			>,
 		{ persistence: 'local' }
 	);
 
@@ -77,13 +83,7 @@
 	$effect(() => {
 		const configs = configuredQuery.data;
 		if (configs && configs.length > 0 && !configuredQuery.refreshing) {
-			setEnabledProviders(
-				new Set(
-					configs
-						.filter((c) => c.enabled && c.hasKey)
-						.map((c) => c.id)
-				)
-			);
+			setEnabledProviders(new Set(configs.filter((c) => c.enabled && c.hasKey).map((c) => c.id)));
 		}
 	});
 
@@ -230,7 +230,7 @@
 							</span>
 							<button
 								type="button"
-								class="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors"
+								class="text-[10px] text-muted-foreground/60 transition-colors hover:text-foreground"
 								onclick={() => (showCustomForm = false)}
 							>
 								Cancel
@@ -273,15 +273,9 @@
 									>
 										<Select.Trigger class="w-full text-xs">{$cfData.apiType}</Select.Trigger>
 										<Select.Content>
-											<Select.Item value="openai-completions"
-												>OpenAI Completions</Select.Item
-											>
-											<Select.Item value="openai-responses"
-												>OpenAI Responses</Select.Item
-											>
-											<Select.Item value="anthropic-messages"
-												>Anthropic Messages</Select.Item
-											>
+											<Select.Item value="openai-completions">OpenAI Completions</Select.Item>
+											<Select.Item value="openai-responses">OpenAI Responses</Select.Item>
+											<Select.Item value="anthropic-messages">Anthropic Messages</Select.Item>
 										</Select.Content>
 									</Select.Root>
 								</Form.Control>

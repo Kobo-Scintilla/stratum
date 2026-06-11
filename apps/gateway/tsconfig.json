@@ -1,17 +1,17 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "NodeNext",
-		"moduleResolution": "NodeNext",
-		"strict": true,
-		"experimentalDecorators": true,
-		"useDefineForClassFields": false,
-		"skipLibCheck": true,
-		"esModuleInterop": true,
-		"noEmit": true,
-		"sourceMap": true,
-		"types": ["bun-types"],
-		"allowImportingTsExtensions": true
-	},
-	"include": ["src/**/*.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "sourceMap": true,
+    "types": ["bun-types"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts"]
 }

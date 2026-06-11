@@ -4,7 +4,7 @@ import { browser } from '$app/environment';
 
 /* ─── Types ─── */
 
-export type TabId = 'sessions' | 'providers';
+export type TabId = 'sessions' | 'providers' | 'settings';
 
 export type NavItem = {
 	id: TabId;
@@ -14,12 +14,16 @@ export type NavItem = {
 
 /* ─── Nav items ─── */
 
-import { Message01FreeIcons, Settings02FreeIcons } from '@hugeicons/core-free-icons';
+import { Folder01Icon, Settings02FreeIcons, ApiIcon } from '@hugeicons/core-free-icons';
 import type { IconSvgElement } from '@hugeicons/svelte';
 
-export const navItems: NavItem[] = [
-	{ id: 'sessions', title: 'Sessions', icon: Message01FreeIcons },
-	{ id: 'providers', title: 'Providers', icon: Settings02FreeIcons }
+export const navTopItems: NavItem[] = [
+	{ id: 'sessions', title: 'Sessions', icon: Folder01Icon },
+	{ id: 'providers', title: 'Providers', icon: ApiIcon }
+];
+
+export const navBottomItems: NavItem[] = [
+	{ id: 'settings', title: 'Settings', icon: Settings02FreeIcons }
 ];
 
 /* ─── Per-request nav state via context ─── */

@@ -14,8 +14,7 @@
 
 <Sidebar.Provider style="--sidebar-width: 350px;" bind:open={sidebarOpen}>
 	<AppSidebar />
-	<Sidebar.Inset>
+	<Sidebar.Inset class="bg-transparent!">
 		{@render children?.()}
 	</Sidebar.Inset>
 </Sidebar.Provider>
-

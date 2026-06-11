@@ -1,21 +1,21 @@
 {
-	"name": "@opaius/shared",
-	"version": "0.0.1",
-	"private": true,
-	"type": "module",
-	"exports": {
-		"./entities/*.js": "./src/entities/*.ts",
-		"./types": "./src/types.ts",
-		"./controllers/*.js": "./src/controllers/*.ts"
-	},
-	"scripts": {
-		"check": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@earendil-works/pi-ai": "^0.78.1",
-		"remult": "^3.3.12"
-	},
-	"devDependencies": {
-		"typescript": "^6.0.2"
-	}
+  "name": "@opaius/shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./entities/*.js": "./src/entities/*.ts",
+    "./types": "./src/types.ts",
+    "./controllers/*.js": "./src/controllers/*.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^0.78.1",
+    "remult": "^3.3.12"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
 }

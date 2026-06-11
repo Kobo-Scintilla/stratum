@@ -64,11 +64,7 @@
 	);
 
 	const statusTitle = $derived(
-		!item.hasKey
-			? 'No API key configured'
-			: !item.enabled
-				? 'Disabled'
-				: 'Active'
+		!item.hasKey ? 'No API key configured' : !item.enabled ? 'Disabled' : 'Active'
 	);
 
 	async function handleSave() {
@@ -92,25 +88,20 @@
 	class="overflow-hidden rounded-xl border border-border/40 bg-card/20"
 >
 	<Collapsible.Trigger
-		class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-medium hover:bg-accent/50 transition-colors outline-none"
+		class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors outline-none hover:bg-accent/50"
 	>
-		<div class="flex items-center gap-2 min-w-0">
-			<span
-				class="size-1.5 shrink-0 rounded-full {statusColor}"
-				title={statusTitle}
-			></span>
+		<div class="flex min-w-0 items-center gap-2">
+			<span class="size-1.5 shrink-0 rounded-full {statusColor}" title={statusTitle}></span>
 			<span class="truncate text-xs font-medium">{formatName(item.id)}</span>
-			<span class="shrink-0 font-mono text-[10px] text-muted-foreground"
-				>{item.id}</span
-			>
+			<span class="shrink-0 font-mono text-[10px] text-muted-foreground">{item.id}</span>
 		</div>
 		<Icon
 			icon={ArrowDown01FreeIcons}
-			class="size-3 text-muted-foreground/60 transition-transform ui-open:rotate-180"
+			class="ui-open:rotate-180 size-3 text-muted-foreground/60 transition-transform"
 		/>
 	</Collapsible.Trigger>
 	<Collapsible.Content>
-		<div class="flex flex-col gap-2 px-3 pb-3 pt-1">
+		<div class="flex flex-col gap-2 px-3 pt-1 pb-3">
 			<Input
 				type="password"
 				placeholder={item.hasKey ? 'Key saved \u2014 type to replace' : 'Enter API key'}
@@ -122,16 +113,14 @@
 				<div class="flex flex-col gap-1.5 rounded-lg bg-muted/30 px-2.5 py-2">
 					<div class="flex items-center justify-between">
 						<span class="text-[10px] text-muted-foreground">Base URL</span>
-						<span
-							class="max-w-[70%] truncate text-[10px] font-mono text-foreground/80"
+						<span class="max-w-[70%] truncate font-mono text-[10px] text-foreground/80"
 							>{item.baseUrl}</span
 						>
 					</div>
 					{#if (item.info.models?.length ?? 0) > 0}
 						<div class="flex items-center justify-between">
 							<span class="text-[10px] text-muted-foreground">Models</span>
-							<span
-								class="max-w-[70%] truncate text-[10px] font-mono text-foreground/80"
+							<span class="max-w-[70%] truncate font-mono text-[10px] text-foreground/80"
 								>{item.info.models.join(', ')}</span
 							>
 						</div>
@@ -141,13 +130,8 @@
 
 			<div class="flex items-center gap-3 pt-1">
 				<div class="flex items-center gap-2">
-					<Switch
-						checked={item.enabled}
-						onCheckedChange={(v: boolean) => ontoggle?.(item.id, v)}
-					/>
-					<span class="text-xs text-muted-foreground"
-						>{item.enabled ? 'Enabled' : 'Disabled'}</span
-					>
+					<Switch checked={item.enabled} onCheckedChange={(v: boolean) => ontoggle?.(item.id, v)} />
+					<span class="text-xs text-muted-foreground">{item.enabled ? 'Enabled' : 'Disabled'}</span>
 				</div>
 				<div class="flex-1"></div>
 				{#if item.baseUrl}

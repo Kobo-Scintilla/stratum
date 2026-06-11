@@ -31,20 +31,23 @@
 	}
 </script>
 
-<div class="sticky bottom-0 border-t border-border/25 bg-background px-4 py-3">
+<div
+	class="mx-auto max-w-lg rounded-2xl border border-border/60 bg-card px-3 py-2.5 shadow-xl transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20"
+>
 	<form
-		class="mx-auto flex max-w-2xl items-center gap-2"
+		class="flex items-center gap-2"
 		onsubmit={(e) => {
 			e.preventDefault();
 			submit();
 		}}
 	>
-		<Input
+		<input
 			type="text"
 			placeholder="Type a message..."
 			bind:value={text}
 			{disabled}
 			onkeydown={handleKeydown}
+			class="min-w-0 flex-1 border-none bg-transparent px-1 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 focus:outline-none"
 		/>
 		<Button type="submit" size="icon" disabled={disabled || !text.trim()}>
 			<Icon icon={Navigation03Icon} class="size-4" />

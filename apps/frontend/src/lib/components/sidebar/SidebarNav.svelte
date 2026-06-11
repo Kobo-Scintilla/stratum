@@ -1,11 +1,21 @@
 <script lang="ts">
-	import { navItems, useNavState } from '$lib/stores/nav-state.svelte.js';
+	import { navTopItems, navBottomItems, useNavState } from '$lib/stores/nav-state.svelte.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import Icon from '../Icon.svelte';
 
 	const sidebar = useSidebar();
 	const nav = useNavState();
+
+	function onNavClick(id: string) {
+		const wasActive = nav.current === id;
+		nav.toggle(id as any);
+		if (wasActive) {
+			sidebar.setOpen(false);
+		} else {
+			sidebar.setOpen(true);
+		}
+	}
 </script>
 
 <Sidebar.Root collapsible="none" class="w-[calc(var(--sidebar-width-icon)+1px)]! border-e">
@@ -13,21 +23,34 @@
 		<Sidebar.Group>
 			<Sidebar.GroupContent class="px-1.5 md:px-0">
 				<Sidebar.Menu>
-					{#each navItems as item (item.id)}
+					{#each navTopItems as item (item.id)}
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								tooltipContent={item.title}
 								isActive={nav.current === item.id}
 								class="px-2.5 md:px-2"
-								onclick={() => {
-									const wasActive = nav.current === item.id;
-									nav.toggle(item.id);
-									if (wasActive) {
-										sidebar.setOpen(false);
-									} else {
-										sidebar.setOpen(true);
-									}
-								}}
+								onclick={() => onNavClick(item.id)}
+							>
+								<Icon icon={item.icon} class="size-5" />
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					{/each}
+				</Sidebar.Menu>
+			</Sidebar.GroupContent>
+		</Sidebar.Group>
+
+		<div class="flex-1"></div>
+
+		<Sidebar.Group>
+			<Sidebar.GroupContent class="border-t border-sidebar-border/20 px-1.5 pt-2 md:px-0">
+				<Sidebar.Menu>
+					{#each navBottomItems as item (item.id)}
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton
+								tooltipContent={item.title}
+								isActive={nav.current === item.id}
+								class="px-2.5 md:px-2"
+								onclick={() => onNavClick(item.id)}
 							>
 								<Icon icon={item.icon} class="size-5" />
 							</Sidebar.MenuButton>
@@ -37,6 +60,4 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 	</Sidebar.Content>
-
-	<Sidebar.Footer />
 </Sidebar.Root>

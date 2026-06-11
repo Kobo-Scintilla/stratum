@@ -9,7 +9,7 @@
 		providers = [],
 		configuredIds = new Set<string>(),
 		onadd,
-		onaddcustom,
+		onaddcustom
 	}: {
 		providers: Array<{ id: string; models: string[] }>;
 		configuredIds: Set<string>;
@@ -27,9 +27,7 @@
 			.join(' ');
 	}
 
-	const unconfigured = $derived(
-		providers.filter((p) => !configuredIds.has(p.id))
-	);
+	const unconfigured = $derived(providers.filter((p) => !configuredIds.has(p.id)));
 
 	const filtered = $derived(
 		query.trim()
@@ -101,25 +99,18 @@
 				{#if filtered.length > 0}
 					<Command.Group>
 						{#each filtered as p (p.id)}
-							<Command.Item
-								value={p.id}
-								onclick={() => handleSelect(p.id)}
-							>
+							<Command.Item value={p.id} onclick={() => handleSelect(p.id)}>
 								<div class="flex flex-col gap-0">
 									<span class="text-xs font-medium">{formatName(p.id)}</span>
 									<span class="text-[10px] text-muted-foreground"
-										>{p.id} &middot; {p.models.length} model{p.models.length === 1
-											? ''
-											: 's'}</span
+										>{p.id} &middot; {p.models.length} model{p.models.length === 1 ? '' : 's'}</span
 									>
 								</div>
 							</Command.Item>
 						{/each}
 					</Command.Group>
 				{:else}
-					<div class="py-6 text-center text-xs text-muted-foreground">
-						No providers found
-					</div>
+					<div class="py-6 text-center text-xs text-muted-foreground">No providers found</div>
 				{/if}
 				<Command.Separator />
 				<Command.Item onclick={handleCustom}>

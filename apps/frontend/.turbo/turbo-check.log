@@ -1,0 +1,5 @@
+[0m[2m[35m$[0m [2m[1mNODE_OPTIONS='--no-deprecation' svelte-kit sync && NODE_OPTIONS='--no-deprecation' svelte-check --tsconfig ./tsconfig.json[0m
+Loading svelte-check in workspace: /home/cioky/Projects/app/apps/frontend
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings

@@ -1,18 +1,24 @@
 import { remult } from 'remult';
 import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
+import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
 
-export async function load({ params }) {
+export async function load({ params, fetch }) {
+	remult.apiClient.httpClient = fetch;
 	const sessionId = params.sessionId;
-	if (!sessionId) return { messages: [] };
+	if (!sessionId) return { messages: [], settings: null };
 
-	// Fetch latest 50 messages descending
-	const messages = await remult.repo(ChatMessage).find({
-		where: { sessionId },
-		orderBy: { sortOrder: 'desc' },
-		limit: 50
-	});
+	const [messages, settings] = await Promise.all([
+		remult.repo(ChatMessage).find({
+			where: { sessionId },
+			orderBy: { sortOrder: 'desc' },
+			limit: 50
+		}),
+		remult
+			.repo(ChatSessionSettings)
+			.findId(sessionId)
+			.catch(() => null)
+	]);
 
-	// Reverse to ascending for chronological serialization
 	return {
 		messages: [...messages].reverse().map((m) => ({
 			id: m.id,
@@ -25,7 +31,25 @@ export async function load({ params }) {
 			toolResult: m.toolResult,
 			isError: m.isError,
 			sortOrder: m.sortOrder,
-			createdAt: m.createdAt.toISOString()
-		}))
+			createdAt: m.createdAt.toISOString(),
+			inputTokens: m.inputTokens,
+			outputTokens: m.outputTokens,
+			cacheReadTokens: m.cacheReadTokens,
+			cacheWriteTokens: m.cacheWriteTokens,
+			contextMessages: m.contextMessages,
+			usageCost: m.usageCost,
+			headroomTokensSaved: m.headroomTokensSaved,
+			headroomRatio: m.headroomRatio
+		})),
+		settings: settings
+			? {
+					id: settings.id,
+					modelProvider: settings.modelProvider,
+					modelId: settings.modelId,
+					contextWindow: settings.contextWindow,
+					thinkingLevel: settings.thinkingLevel,
+					headroomEnabled: settings.headroomEnabled
+				}
+			: null
 	};
 }

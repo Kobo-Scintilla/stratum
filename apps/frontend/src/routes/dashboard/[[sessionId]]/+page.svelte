@@ -9,6 +9,7 @@
 	import { tick, onMount } from 'svelte';
 	import { remult } from 'remult';
 	import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
+	import { AppSettings } from '@opaius/shared/entities/app-settings.js';
 	import { getEnabledProviders, setEnabledProviders } from '$lib/stores/providers-state.svelte.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
@@ -20,19 +21,35 @@
 	import ChatStream from '$lib/components/chat/ChatStream.svelte';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
 	import ToolCall from '$lib/components/chat/ToolCall.svelte';
+	import SessionStatsWidget from '$lib/components/chat/SessionStatsWidget.svelte';
+	let { data }: { data: any } = $props();
 
 	let sessionId = $derived($page.params.sessionId);
-	let providerInfo = $state<Array<{ id: string; models: string[] }>>([]);
-	let enabledProviders = $state<Set<string>>(new Set());
-	let sessionSettings = $state<ChatSessionSettings | null>(null);
+	// svelte-ignore state_referenced_locally
+	let providerInfo = $state<Array<{ id: string; models: string[] }>>(data.providers ?? []);
+	// svelte-ignore state_referenced_locally
+	let sessionSettings = $state<ChatSessionSettings | null>(data.settings ?? null);
+	// svelte-ignore state_referenced_locally
+	let appDefaults: { modelProvider: string; modelId: string; thinkingLevel: string } | null =
+		$state(data.defaults ?? null);
+
+	// Initialize the shared store during SSR/hydration from server-loaded data
+	// svelte-ignore state_referenced_locally
+	const initialEnabled = new Set<string>(
+		(data.configured ?? [])
+			.filter((c: any) => c.enabled && c.hasKey)
+			.map((c: any) => c.id as string)
+	);
+	setEnabledProviders(initialEnabled);
+
+	// svelte-ignore state_referenced_locally
+	let enabledProviders = $state<Set<string>>(initialEnabled);
 	let modelSwitcherOpen = $state(false);
 	let pendingModel = $state<{ provider: string; model: string } | null>(null);
 	let thinkingSwitcherOpen = $state(false);
 	let pendingThinkingLevel = $state('medium');
 	const currentThinkingLevel = $derived(
-		sessionId && sessionSettings
-			? sessionSettings.thinkingLevel
-			: pendingThinkingLevel
+		sessionId && sessionSettings ? sessionSettings.thinkingLevel : pendingThinkingLevel
 	);
 	const thinkingOptions = [
 		{ value: 'off', label: 'Disabled' },
@@ -55,6 +72,20 @@
 		thinkingSwitcherOpen = false;
 	}
 
+	// Keep states synchronized with layout load data updates
+	$effect(() => {
+		providerInfo = data.providers ?? [];
+		sessionSettings = data.settings ?? null;
+		appDefaults = data.defaults ?? null;
+
+		const nextEnabled = new Set<string>(
+			(data.configured ?? [])
+				.filter((c: any) => c.enabled && c.hasKey)
+				.map((c: any) => c.id as string)
+		);
+		setEnabledProviders(nextEnabled);
+	});
+
 	// Sync from shared store when sidebar toggles providers
 	$effect(() => {
 		enabledProviders = getEnabledProviders();
@@ -63,7 +94,11 @@
 	// Clear model selection if its provider gets disabled
 	$effect(() => {
 		const enabled = getEnabledProviders();
-		if (sessionSettings?.modelProvider && sessionSettings.modelId && !enabled.has(sessionSettings.modelProvider)) {
+		if (
+			sessionSettings?.modelProvider &&
+			sessionSettings.modelId &&
+			!enabled.has(sessionSettings.modelProvider)
+		) {
 			if (sessionId) {
 				updateSettings({ modelProvider: '', modelId: '' });
 			} else {
@@ -73,18 +108,38 @@
 	});
 
 	onMount(async () => {
-		const [providers, configured] = await Promise.all([
+		const [providers, configured, defaults] = await Promise.all([
 			remult.call(AgentService.getProvidersInfo, undefined),
-			remult.call(AgentService.getConfiguredProviders, undefined)
+			remult.call(AgentService.getConfiguredProviders, undefined),
+			remult
+				.repo(AppSettings)
+				.findId('_defaults')
+				.catch(() => null)
 		]);
-		providerInfo = providers as Array<{ id: string; envKeys: string[]; models: string[]; isCustom: boolean }>;
-		setEnabledProviders(new Set(
-			(configured as Array<{ id: string; enabled: boolean; hasKey: boolean }>).filter((c) => c.enabled && c.hasKey).map((c) => c.id)
-		));
+		providerInfo = providers as Array<{
+			id: string;
+			envKeys: string[];
+			models: string[];
+			isCustom: boolean;
+		}>;
+		const freshEnabled = new Set(
+			(configured as Array<{ id: string; enabled: boolean; hasKey: boolean }>)
+				.filter((c) => c.enabled && c.hasKey)
+				.map((c) => c.id)
+		);
+		setEnabledProviders(freshEnabled);
+		enabledProviders = freshEnabled;
+		if (defaults) {
+			appDefaults = {
+				modelProvider: defaults.defaultModelProvider,
+				modelId: defaults.defaultModelId,
+				thinkingLevel: defaults.defaultThinkingLevel
+			};
+		}
 	});
 
 	// svelte-ignore state_referenced_locally
-	let chat: ChatSession = getChatSession(sessionId, $page.data.messages);
+	let chat: ChatSession = getChatSession(sessionId, data.messages);
 	// Show toast on chat errors
 	$effect(() => {
 		if (chat.error) {
@@ -106,7 +161,7 @@
 		if (cur) {
 			if (cur !== prevSessionId) {
 				prevSessionId = cur;
-				chat.switchSession(cur, $page.data.messages);
+				chat.switchSession(cur, data.messages);
 			}
 		} else if (prevSessionId !== undefined) {
 			prevSessionId = undefined;
@@ -126,10 +181,11 @@
 						try {
 							sessionSettings = await remult.repo(ChatSessionSettings).insert({
 								id: sessionId,
-								modelProvider: '',
-								modelId: '',
+								modelProvider: pendingModel?.provider ?? '',
+								modelId: pendingModel?.model ?? '',
 								contextWindow: 20,
-								thinkingLevel: pendingThinkingLevel
+								thinkingLevel: pendingThinkingLevel,
+								headroomEnabled: true
 							});
 						} catch (e) {
 							sessionSettings = (await remult.repo(ChatSessionSettings).findId(sessionId)) || null;
@@ -159,7 +215,9 @@
 				modelProvider: model.provider,
 				modelId: model.model,
 				contextWindow: 20,
-				thinkingLevel: pendingThinkingLevel
+				thinkingLevel: pendingThinkingLevel,
+				headroomEnabled: true,
+				title: text.slice(0, 50)
 			});
 			pendingModel = null;
 			await chat.switchSession(sid);
@@ -219,26 +277,30 @@
 			}))
 	);
 	const hasActiveProviders = $derived(enabledProviders.size > 0);
+
+	// Resolve effective model — session setting > app default
+	const effectiveModel = $derived.by(() => {
+		if (pendingModel) return pendingModel;
+		if (sessionSettings?.modelProvider && sessionSettings?.modelId) {
+			return { provider: sessionSettings.modelProvider, model: sessionSettings.modelId };
+		}
+		const d = appDefaults;
+		if (d?.modelProvider && d?.modelId) {
+			return { provider: d.modelProvider, model: d.modelId };
+		}
+		return null;
+	});
+
 	const modelReady = $derived(
-		!!pendingModel || (
-			!!sessionSettings?.modelProvider && !!sessionSettings?.modelId && enabledProviders.has(sessionSettings.modelProvider)
-		)
+		!!pendingModel || (!!effectiveModel && enabledProviders.has(effectiveModel.provider))
 	);
 
 	const currentModelLabel = $derived(
-		pendingModel
-			? `${pendingModel.provider}/${pendingModel.model}`
-			: sessionSettings?.modelProvider && sessionSettings?.modelId
-				? `${sessionSettings.modelProvider}/${sessionSettings.modelId}`
-				: 'Select a model'
+		effectiveModel ? `${effectiveModel.provider}/${effectiveModel.model}` : 'Select a model'
 	);
 
 	const activeValue = $derived(
-		pendingModel
-			? `${pendingModel.provider}/${pendingModel.model}`
-			: sessionSettings?.modelProvider && sessionSettings?.modelId
-				? `${sessionSettings.modelProvider}/${sessionSettings.modelId}`
-				: ''
+		effectiveModel ? `${effectiveModel.provider}/${effectiveModel.model}` : ''
 	);
 	function onModelSelect(value: string) {
 		const [provider, ...rest] = value.split('/');
@@ -255,30 +317,42 @@
 </script>
 
 <div class="flex h-full flex-col">
-	<ScrollArea.Root class="flex-1 px-4" bind:viewportRef={viewport}>
+	<SessionStatsWidget
+		messages={chat.messages}
+		activeStreams={chat.activeStreams}
+		{sessionId}
+		headroomEnabled={sessionSettings?.headroomEnabled ?? true}
+		contextWindow={sessionSettings?.contextWindow ?? 20}
+	/>
+	<ScrollArea.Root class="flex-1 px-4 pr-16" bind:viewportRef={viewport}>
 		<div class="mx-auto flex max-w-2xl flex-col gap-4 py-4">
 			{#if chat.displayMessages.length === 0 && chat.activeStreams.length === 0 && !chat.isSending}
 				<EmptyState />
 			{/if}
 
 			{#each chat.displayMessages as msg (msg.id)}
-				{#if msg.content && msg.content.trim() !== ''}
-					<ChatMessage message={msg} />
-				{/if}
-				{#if msg.toolCalls && msg.toolCalls.length > 0}
-					<div class="flex gap-3">
-						<div class="w-8 shrink-0"></div>
-						<div class="max-w-[80%] space-y-2">
-							{#each msg.toolCalls as tc}
-								<ToolCall toolCall={tc} result={tc.result} open={false} />
-							{/each}
-						</div>
-					</div>
-				{/if}
+				<ChatMessage message={msg} />
 			{/each}
 
-			{#each chat.activeStreams as stream (stream.id)}
-				<ChatStream {stream} />
+			{#each chat.activeStreams as stream, index (stream.id)}
+				{@const isConsecutive =
+					index === 0 &&
+					chat.displayMessages.length > 0 &&
+					chat.displayMessages[chat.displayMessages.length - 1].role === 'assistant'}
+				{@const lastMsg = isConsecutive
+					? chat.displayMessages[chat.displayMessages.length - 1]
+					: null}
+				{@const isDuplicate =
+					lastMsg &&
+					(!stream.text || lastMsg.content.includes(stream.text)) &&
+					(!stream.segments ||
+						stream.segments.every(
+							(seg) =>
+								seg.type !== 'tool' || lastMsg.activities?.some((act) => act.id === seg.toolCallId)
+						))}
+				{#if !isDuplicate}
+					<ChatStream {stream} showAvatar={!isConsecutive} />
+				{/if}
 			{/each}
 
 			<div class="h-2"></div>
@@ -286,27 +360,75 @@
 	</ScrollArea.Root>
 
 	<!-- Chat Input + Model Switcher -->
-	<div class="sticky bottom-0 border-t border-border/25 bg-background">
-		<ChatInput disabled={chat.isSending || !modelReady} error={!hasActiveProviders ? 'Configure a provider with an API key in the sidebar to start.' : !modelReady ? 'Select a model above to start.' : chat.error} onsend={handleSend} />
+	<div class="sticky bottom-0 border-t border-border/10 bg-transparent pt-2 pb-4">
+		<ChatInput
+			disabled={chat.isSending || !modelReady}
+			error={!hasActiveProviders
+				? 'Configure a provider with an API key in the sidebar to start.'
+				: !modelReady
+					? 'Select a model above to start.'
+					: chat.error}
+			onsend={handleSend}
+		/>
 
 		{#snippet modelSelector()}
+			{@const activeCtxMsgs =
+				chat.displayMessages.filter((m) => m.role === 'assistant').slice(-1)[0]?.contextMessages ?? 0}
+			{@const limit = sessionSettings?.contextWindow ?? 20}
+			{@const pct = Math.min(Math.max(Math.round((activeCtxMsgs / limit) * 100), 0), 100)}
 			<Popover.Root bind:open={modelSwitcherOpen}>
-				<Popover.Trigger>
-					<button
-						type="button"
-						class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+				<Popover.Trigger
+					class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/15 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+				>
+					<!-- Circular Context Indicator -->
+					<div
+						class="relative flex items-center justify-center"
+						title="Context filled: {pct}% ({activeCtxMsgs}/{limit} msgs)"
 					>
-						<span>{currentModelLabel}</span>
-						<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M6 9l6 6 6-6" />
+						<svg class="size-3.5" viewBox="0 0 36 36">
+							<path
+								stroke="currentColor"
+								class="text-muted-foreground/15"
+								stroke-width="4.5"
+								fill="none"
+								d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+							/>
+							<path
+								stroke="currentColor"
+								class="{pct >= 90
+									? 'text-destructive'
+									: pct >= 75
+										? 'text-amber-500'
+										: 'text-primary'}"
+								stroke-width="4.5"
+								stroke-dasharray="{pct}, 100"
+								stroke-linecap="round"
+								fill="none"
+								d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+							/>
 						</svg>
-					</button>
+					</div>
+
+					<span>{currentModelLabel}</span>
+					<svg
+						class="size-3 opacity-60"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M6 9l6 6 6-6" />
+					</svg>
 				</Popover.Trigger>
 				<Popover.Content side="top" sideOffset={6} align="end" class="w-80 p-0">
 					<Command.Root value={activeValue}>
 						<Command.Input placeholder="Search models..." />
 						<Command.List class="max-h-[min(60vh,28rem)]">
-							<Command.Empty>{enabledProviders.size === 0 ? 'No providers configured — open the sidebar to add one.' : 'No model found.'}</Command.Empty>
+							<Command.Empty
+								>{enabledProviders.size === 0
+									? 'No providers configured — open the sidebar to add one.'
+									: 'No model found.'}</Command.Empty
+							>
 							{#each modelGroups as group}
 								<Command.Group heading={group.provider}>
 									{#each group.models as m}
@@ -315,7 +437,10 @@
 											class="content-visibility-auto"
 											onclick={() => onModelSelect(m.value)}
 										>
-											<span class="text-[11px] font-mono text-muted-foreground shrink-0 w-24 truncate">{m.provider}</span>
+											<span
+												class="w-24 shrink-0 truncate font-mono text-[11px] text-muted-foreground"
+												>{m.provider}</span
+											>
 											<span class="truncate text-xs">{m.label}</span>
 										</Command.Item>
 									{/each}
@@ -329,17 +454,20 @@
 
 		{#snippet thinkingSelector()}
 			<Popover.Root bind:open={thinkingSwitcherOpen}>
-				<Popover.Trigger>
-					<button
-						type="button"
-						class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+				<Popover.Trigger
+					class="flex items-center gap-1.5 rounded-lg border border-border/30 bg-accent/5 px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/15 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+				>
+					<Icon icon={AiBrain05Icon} class="size-3.5 opacity-70" />
+					<span>Thinking: {currentThinkingLabel}</span>
+					<svg
+						class="size-3 opacity-60"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
 					>
-						<Icon icon={AiBrain05Icon} class="size-3.5 opacity-70" />
-						<span>Thinking: {currentThinkingLabel}</span>
-						<svg class="size-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M6 9l6 6 6-6" />
-						</svg>
-					</button>
+						<path d="M6 9l6 6 6-6" />
+					</svg>
 				</Popover.Trigger>
 				<Popover.Content side="top" sideOffset={6} align="end" class="w-44 p-0">
 					<Command.Root value={currentThinkingLevel}>
@@ -350,7 +478,7 @@
 										value={opt.value}
 										onclick={() => onThinkingSelect(opt.value)}
 										data-checked={currentThinkingLevel === opt.value ? 'true' : undefined}
-										class="flex items-center justify-between text-xs cursor-pointer"
+										class="flex cursor-pointer items-center justify-between text-xs"
 									>
 										<span>{opt.label}</span>
 									</Command.Item>
@@ -362,8 +490,36 @@
 			</Popover.Root>
 		{/snippet}
 
-		{#if (sessionId && sessionSettings) || (!sessionId && hasActiveProviders)}
-			<div class="mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pb-2 pt-1">
+		{#snippet headroomToggle()}
+			<button
+				type="button"
+				onclick={() => updateSettings({ headroomEnabled: !sessionSettings?.headroomEnabled })}
+				class="flex items-center gap-1 rounded-lg border px-3 py-1 text-[11px] transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none
+					{sessionSettings?.headroomEnabled
+					? 'border-primary/30 bg-primary/8 text-primary hover:bg-primary/15'
+					: 'border-border/30 bg-accent/5 text-muted-foreground hover:bg-accent/15 hover:text-foreground'}"
+			>
+				<svg
+					class="size-3.5 shrink-0"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M4 14a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2z" />
+					<path d="M12 4v4" />
+					<path d="M8 18v2" />
+					<path d="M16 18v2" />
+				</svg>
+				<span>Compress</span>
+			</button>
+		{/snippet}
+
+		{#if sessionId || hasActiveProviders}
+			<div
+				class="mx-auto mt-2 flex w-fit max-w-lg items-center justify-end gap-2 rounded-xl border border-border/20 bg-black/5 px-3 py-1.5 backdrop-blur-2xl"
+			>
+				{@render headroomToggle()}
 				{@render thinkingSelector()}
 				{@render modelSelector()}
 			</div>

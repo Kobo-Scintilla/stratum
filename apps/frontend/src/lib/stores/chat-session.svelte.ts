@@ -2,49 +2,135 @@ import { browser } from '$app/environment';
 import { remult } from 'remult';
 import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
 import { ActiveStream } from '@opaius/shared/entities/active-stream.js';
-import type { ToolCallInfo } from '@opaius/shared/entities/chat-message.js';
 import { AgentService } from '@opaius/shared/controllers/agent-service.js';
+import { parseThinking } from '$lib/utils/thinking.js';
 
 // ── Enriched display types ──────────────────────────────────────
 
-export interface EnrichedToolCall {
+export interface ActivityStep {
 	id: string;
-	name: string;
+	type: 'think' | 'tool' | 'info';
+	name?: string;
 	args?: unknown;
+	text?: string;
 	result?: { result: string; isError: boolean } | null;
 	isError?: boolean;
 }
 
 export interface EnrichedMessage {
 	id: string;
-	role: string;
+	role: 'user' | 'assistant';
 	content: string;
-	toolCalls?: EnrichedToolCall[];
+	activities?: ActivityStep[];
+	headroomTokensSaved?: number;
+	headroomRatio?: number;
+	inputTokens?: number;
+	outputTokens?: number;
+	cacheReadTokens?: number;
+	cacheWriteTokens?: number;
+	contextMessages?: number;
 }
 
-// ── Helper: build tool results map and return display messages ──
+// ── Helper: group messages, thinking, and tool results ──
 
 function getDisplayMessages(msgs: ChatMessage[]): EnrichedMessage[] {
 	const results = new Map<string, { result: string; isError: boolean }>();
 	for (const m of msgs) {
 		if (m.role === 'tool' && m.toolCallId) {
 			results.set(m.toolCallId, {
-				result: String(m.toolResult ?? ''),
+				result: String(m.toolResult ?? m.content ?? ''),
 				isError: m.isError ?? false
 			});
 		}
 	}
-	return msgs
-		.filter((m) => m.role !== 'tool')
-		.map((m) => ({
-			id: m.id,
-			role: m.role,
-			content: m.content,
-			toolCalls: m.toolCalls?.map((tc) => ({
-				...tc,
-				result: results.get(tc.id) ?? null
-			}))
-		}));
+
+	const displayMsgs: EnrichedMessage[] = [];
+	let currentAssistant: EnrichedMessage | null = null;
+
+	for (const m of msgs) {
+		if (m.role === 'tool') {
+			continue;
+		}
+
+		if (m.role === 'user') {
+			currentAssistant = null;
+			displayMsgs.push({
+				id: m.id,
+				role: 'user',
+				content: m.content
+			});
+			continue;
+		}
+
+		if (m.role === 'assistant') {
+			if (!currentAssistant) {
+				currentAssistant = {
+					id: m.id,
+					role: 'assistant',
+					content: '',
+					activities: [],
+					headroomTokensSaved: 0,
+					headroomRatio: 1,
+					inputTokens: 0,
+					outputTokens: 0,
+					cacheReadTokens: 0,
+					cacheWriteTokens: 0,
+					contextMessages: 0
+				};
+				displayMsgs.push(currentAssistant);
+			} else {
+				if (currentAssistant.content && currentAssistant.content.trim() !== '') {
+					currentAssistant.activities!.push({
+						id: crypto.randomUUID(),
+						type: 'info',
+						text: currentAssistant.content
+					});
+					currentAssistant.content = '';
+				}
+			}
+
+			const blocks = parseThinking(m.content);
+			for (const block of blocks) {
+				if (block.type === 'think') {
+					currentAssistant.activities!.push({
+						id: crypto.randomUUID(),
+						type: 'think',
+						text: block.text
+					});
+				} else if (block.type === 'text') {
+					currentAssistant.content = block.text;
+				}
+			}
+
+			if (m.toolCalls && m.toolCalls.length > 0) {
+				for (const tc of m.toolCalls) {
+					currentAssistant.activities!.push({
+						id: tc.id,
+						type: 'tool',
+						name: tc.name,
+						args: tc.args,
+						result: results.get(tc.id) ?? null,
+						isError: results.get(tc.id)?.isError ?? false
+					});
+				}
+			}
+
+			currentAssistant.headroomTokensSaved =
+				(currentAssistant.headroomTokensSaved ?? 0) + (m.headroomTokensSaved ?? 0);
+			if (m.headroomTokensSaved && m.headroomTokensSaved > 0) {
+				currentAssistant.headroomRatio = m.headroomRatio ?? 1;
+			}
+			currentAssistant.inputTokens = (currentAssistant.inputTokens ?? 0) + (m.inputTokens ?? 0);
+			currentAssistant.outputTokens = (currentAssistant.outputTokens ?? 0) + (m.outputTokens ?? 0);
+			currentAssistant.cacheReadTokens =
+				(currentAssistant.cacheReadTokens ?? 0) + (m.cacheReadTokens ?? 0);
+			currentAssistant.cacheWriteTokens =
+				(currentAssistant.cacheWriteTokens ?? 0) + (m.cacheWriteTokens ?? 0);
+			currentAssistant.contextMessages = m.contextMessages ?? 0;
+		}
+	}
+
+	return displayMsgs;
 }
 
 // ── Chat session ────────────────────────────────────────────────
@@ -109,7 +195,10 @@ export function createChatSession(
 		unsubs = [];
 
 		// Run in background without blocking subscription to prevent UI lag/flicker
-		remult.repo(ChatMessage).count({ sessionId: sid }).catch(() => {});
+		remult
+			.repo(ChatMessage)
+			.count({ sessionId: sid })
+			.catch(() => {});
 
 		unsubs.push(
 			remult

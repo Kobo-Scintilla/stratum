@@ -40,7 +40,7 @@
 					>Args</span
 				>
 				<pre
-					class="mt-0.5 font-mono text-xs whitespace-pre-wrap text-muted-foreground">{JSON.stringify(
+					class="mt-0.5 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-muted-foreground">{JSON.stringify(
 						toolCall.args,
 						null,
 						2
@@ -52,7 +52,9 @@
 				<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase"
 					>Result</span
 				>
-				<div class="mt-0.5 max-h-32 overflow-y-auto rounded bg-background/50 p-2">
+				<div
+					class="mt-0.5 max-h-32 overflow-y-auto rounded bg-background/50 p-2 font-mono text-[11px] leading-relaxed"
+				>
 					<Markdown content={result.result} />
 				</div>
 			</div>
