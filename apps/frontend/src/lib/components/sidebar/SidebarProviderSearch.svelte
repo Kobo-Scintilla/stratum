@@ -11,7 +11,7 @@
 		onadd,
 		onaddcustom
 	}: {
-		providers: Array<{ id: string; models: string[] }>;
+		providers: Array<{ id: string; models: Array<{ id: string; contextWindow: number }> }>;
 		configuredIds: Set<string>;
 		onadd?: (id: string) => void;
 		onaddcustom?: () => void;
@@ -34,7 +34,7 @@
 			? unconfigured.filter(
 					(p) =>
 						p.id.toLowerCase().includes(query.toLowerCase()) ||
-						p.models.some((m) => m.toLowerCase().includes(query.toLowerCase()))
+						p.models.some((m) => m.id.toLowerCase().includes(query.toLowerCase()))
 				)
 			: unconfigured
 	);

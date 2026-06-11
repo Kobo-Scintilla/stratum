@@ -5,6 +5,7 @@
  * background. The returned object is reactive via Svelte 5 $state — use its
  * properties directly in templates or $derived expressions.
  */
+import { browser } from '$app/environment';
 type Persistence = 'none' | 'local' | 'session';
 
 export interface CachedQuery<T> {
@@ -16,7 +17,7 @@ export interface CachedQuery<T> {
 }
 
 function storage(p: Persistence): Storage | undefined {
-	if (typeof localStorage === 'undefined') return;
+	if (!browser) return;
 	if (p === 'local') return localStorage;
 	if (p === 'session') return sessionStorage;
 }
@@ -101,13 +102,13 @@ export function createCachedQuery<T>(
 	}
 
 	registry.set(key, instance);
-	if (typeof window !== 'undefined') queueMicrotask(() => instance.refresh());
+	if (browser) queueMicrotask(() => instance.refresh());
 	return instance;
 }
 
 export function clearCachedQuery(key: string) {
 	registry.delete(key);
-	if (typeof localStorage !== 'undefined') {
+	if (browser) {
 		localStorage.removeItem('cq:' + key);
 	}
 }

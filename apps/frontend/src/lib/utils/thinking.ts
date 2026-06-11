@@ -3,11 +3,31 @@ export interface ParsedBlock {
 	text: string;
 }
 
+const GENERIC_THOUGHT_PREFIXES = [
+	'i need to',
+	'i should',
+	'i will',
+	'let me',
+	'now let',
+	'ok let',
+	'alright let',
+	'i can',
+	'i am going to',
+	"i'm going to"
+];
+
+export function isThoughtWorthDisplaying(text: string): boolean {
+	const normalized = text.replace(/\s+/g, ' ').trim().toLowerCase();
+	if (!normalized) return false;
+	if (normalized.length >= 160) return true;
+	if (normalized.length < 80) return false;
+	return GENERIC_THOUGHT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
 const START = '<|THINK_START|>';
 const END = '<|THINK_END|>';
 const LEGACY_START = '<think>';
 const LEGACY_END = '</think>';
-
 /**
  * Parse content into thinking/text blocks.
  */
@@ -78,7 +98,7 @@ export function parseStreamSegments(segments: any[]): { activities: any[]; conte
 		if (seg.type === 'text') {
 			const blocks = parseThinking(seg.text);
 			for (const block of blocks) {
-				if (block.type === 'think') {
+				if (block.type === 'think' && isThoughtWorthDisplaying(block.text)) {
 					activities.push({
 						id: crypto.randomUUID(),
 						type: 'think',

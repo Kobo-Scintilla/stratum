@@ -26,4 +26,4 @@ Hono + Remult backend providing the REST endpoints, live query database sync, an
 
 # Child DOX Index
 
-- [src/agent-runtime](file:///home/cioky/Projects/app/apps/gateway/src/agent-runtime/AGENTS.md) — The pi-ai loop, tool runtime, context builder, and Headroom compression.
+- [src/agent-runtime](file:///home/cioky/Projects/app/apps/gateway/src/agent-runtime/AGENTS.md) — The pi-ai loop, tool runtime, context builder, and Headroom module (`headroom/` directory).

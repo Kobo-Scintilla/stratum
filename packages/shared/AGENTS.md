@@ -17,7 +17,7 @@ Defines shared data structures, database entities, and TypeScript types used by 
 - Add/modify fields or validation rules in `src/entities/`.
 - Declare shared TypeScript interfaces in `src/types.ts`.
 - Keep entity schemas synchronized with DB migrations/alterations in `apps/gateway/src/api.ts`.
-- Add `headroomTokensSaved` and `headroomRatio` to `ChatMessage` to record context compression history.
+- Add/modify entity fields to extend shared data models. Ensure fields are properly exported in `src/index.ts`.
 - Add `title` and `pinned` to `ChatSessionSettings` to persist session names and pinning status.
 - Ensure all symbols are exported in `src/index.ts`.
 

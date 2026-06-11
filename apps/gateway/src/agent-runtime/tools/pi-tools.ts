@@ -11,17 +11,27 @@ import piHashlineReadmapExtension from "pi-hashline-readmap";
 import type { ToolDefinition } from "../types.js";
 
 export function getPiCodingTools(cwd: string): ToolDefinition[] {
-  // 1. Load Hashline tools by mocking the ExtensionAPI
+  // 1. Load Hashline tools by mocking the ExtensionAPI.
   const hashlineTools: any[] = [];
   const mockPi = {
-    on(event: string, handler: any) {
-      // Stub
+    on() {
+      return mockPi;
+    },
+    off() {
+      return mockPi;
     },
     registerTool(tool: any) {
       hashlineTools.push(tool);
+      return mockPi;
     },
     events: {
       emit() {},
+      on() {
+        return mockPi.events;
+      },
+      off() {
+        return mockPi.events;
+      },
     },
     exec() {
       return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });

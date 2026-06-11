@@ -1,3 +1,4 @@
+import { browser } from '$app/environment';
 /** Shared state for provider enable/disable across sidebar and dashboard. */
 let enabledProviders = $state<Set<string>>(new Set());
 
@@ -18,13 +19,18 @@ export function toggleProviderEnabled(id: string, enabled: boolean) {
 	}
 	enabledProviders = next;
 }
+export function activeProviderIds(
+	configured: Array<{ id: string; enabled: boolean; hasKey: boolean }>
+): Set<string> {
+	return new Set(configured.filter((c) => c.enabled && c.hasKey).map((c) => c.id));
+}
 
 // ── Cache (persisted to localStorage for instant reload) ──
 
 interface CachedProviderInfo {
 	id: string;
 	envKeys: string[];
-	models: string[];
+	models: Array<{ id: string; contextWindow: number }>;
 	isCustom: boolean;
 }
 
@@ -38,7 +44,7 @@ interface CachedConfigured {
 }
 
 function loadCache<T>(key: string, fallback: T): T {
-	if (typeof localStorage === 'undefined') return fallback;
+	if (!browser) return fallback;
 	try {
 		const raw = localStorage.getItem('providers:' + key);
 		return raw ? JSON.parse(raw) : fallback;
@@ -48,7 +54,7 @@ function loadCache<T>(key: string, fallback: T): T {
 }
 
 function saveCache(key: string, value: unknown) {
-	if (typeof localStorage === 'undefined') return;
+	if (!browser) return;
 	try {
 		localStorage.setItem('providers:' + key, JSON.stringify(value));
 	} catch {
@@ -80,7 +86,7 @@ export function setProviderCache(
 export function clearProviderCache() {
 	cachedProviderInfo = [];
 	cachedConfigured = [];
-	if (typeof localStorage !== 'undefined') {
+	if (browser) {
 		localStorage.removeItem('providers:providerInfo');
 		localStorage.removeItem('providers:configured');
 	}

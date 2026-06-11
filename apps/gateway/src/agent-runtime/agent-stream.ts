@@ -10,7 +10,7 @@ import { ChatMessage } from "@opaius/shared/entities/chat-message.js";
 import { ProviderSetting } from "@opaius/shared/entities/provider-setting.js";
 import type { Context, AgentConfig, TrackedToolCall } from "./types.js";
 import { toolRegistry } from "./agent-tools.js";
-import { compressContext } from "./headroom-manager.js";
+import { compressContext } from "./headroom/index.js";
 import { persistToolResult } from "./agent-context.js";
 
 interface CustomModel {
@@ -150,12 +150,12 @@ async function handleTextDelta(
 ) {
   if (state.isThinking) {
     state.isThinking = false;
-    state.accumulatedText += "</think>";
+    state.accumulatedText += "<|THINK_END|>";
     const last = state.segments[state.segments.length - 1];
     if (last?.type === "text") {
-      last.text += "</think>";
+      last.text += "<|THINK_END|>";
     } else {
-      state.segments.push({ type: "text", text: "</think>" });
+      state.segments.push({ type: "text", text: "<|THINK_END|>" });
     }
   }
   const t = event.delta;
@@ -308,6 +308,7 @@ async function handleThinkingEnd(
   state: StreamState,
   stream: ActiveStream,
 ) {
+  if (!state.isThinking) return; // already closed by handleTextDelta
   state.isThinking = false;
   state.accumulatedText += "<|THINK_END|>";
   const last = state.segments[state.segments.length - 1];
@@ -389,7 +390,7 @@ export async function runStreamLoop(
       `Model ${config.modelProvider}/${config.modelId} not found`,
     );
 
-  const stream = await remult.repo(ActiveStream).findId(streamId);
+  let stream = await remult.repo(ActiveStream).findId(streamId);
   if (!stream) throw new Error(`ActiveStream ${streamId} not found`);
 
   const state: StreamState = {
@@ -411,6 +412,8 @@ export async function runStreamLoop(
     if (config.headroomEnabled) {
       const compressed = await compressContext(context, {
         enabled: true,
+        modelId: config.modelId,
+        contextWindow: config.contextWindow,
       });
       if (compressed) {
         const pct = Math.round((1 - compressed.ratio) * 100);
@@ -483,15 +486,14 @@ export async function runStreamLoop(
         stream.headroomRatio,
       );
       await updateActiveStream(stream, "", [], []);
+      stream.isGenerating = false;
+      await remult.repo(ActiveStream).save(stream);
     }
 
-    const pendingToolCalls = state.toolCalls.filter(
-      (t) => t.result === undefined,
-    );
-    if (pendingToolCalls.length === 0) break;
+    if (state.toolCalls.length === 0) break;
 
     // Execute tools and add results to context for next iteration
-    for (const tc of pendingToolCalls) {
+    for (const tc of state.toolCalls) {
       const { result, isError } = await toolRegistry.execute(
         tc.name,
         tc.args as Record<string, unknown>,
@@ -523,18 +525,29 @@ export async function runStreamLoop(
     state.accumulatedText = "";
     state.toolCalls = [];
     state.segments = [];
+    stream = await remult.repo(ActiveStream).insert({
+      id: crypto.randomUUID(),
+      sessionId,
+      prompt: stream.prompt,
+      text: "",
+      isGenerating: true,
+      createdAt: new Date(),
+      toolCalls: [],
+    });
   }
   // Close thinking block if still open after the loop
   if (state.isThinking) {
     state.isThinking = false;
-    state.accumulatedText += "</think>";
+    state.accumulatedText += "<|THINK_END|>";
     const last = state.segments[state.segments.length - 1];
     if (last?.type === "text") {
-      last.text += "</think>";
+      last.text += "<|THINK_END|>";
     } else {
-      state.segments.push({ type: "text", text: "</think>" });
+      state.segments.push({ type: "text", text: "<|THINK_END|>" });
     }
   }
+  stream.isGenerating = false;
+  await remult.repo(ActiveStream).save(stream);
 }
 
 export async function generateTitleSummary(

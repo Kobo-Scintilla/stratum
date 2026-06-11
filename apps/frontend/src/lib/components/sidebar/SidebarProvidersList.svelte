@@ -2,7 +2,8 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import {
 		toggleProviderEnabled,
-		setEnabledProviders
+		setEnabledProviders,
+		activeProviderIds
 	} from '$lib/stores/providers-state.svelte.js';
 	import { createCachedQuery } from '$lib/utils/cached-query.svelte.js';
 	import { remult } from 'remult';
@@ -22,7 +23,7 @@
 	interface ProviderInfo {
 		id: string;
 		envKeys: string[];
-		models: string[];
+		models: Array<{ id: string; contextWindow: number }>;
 		isCustom: boolean;
 	}
 
@@ -83,7 +84,7 @@
 	$effect(() => {
 		const configs = configuredQuery.data;
 		if (configs && configs.length > 0 && !configuredQuery.refreshing) {
-			setEnabledProviders(new Set(configs.filter((c) => c.enabled && c.hasKey).map((c) => c.id)));
+			setEnabledProviders(activeProviderIds(configs));
 		}
 	});
 

@@ -20,7 +20,7 @@ export async function load({ fetch }) {
 			providers: providers as Array<{
 				id: string;
 				envKeys: string[];
-				models: string[];
+				models: Array<{ id: string; contextWindow: number }>;
 				isCustom: boolean;
 			}>,
 			configured: configured as Array<{ id: string; enabled: boolean; hasKey: boolean }>,
@@ -28,7 +28,8 @@ export async function load({ fetch }) {
 				? {
 						defaultModelProvider: defaults.defaultModelProvider,
 						defaultModelId: defaults.defaultModelId,
-						defaultThinkingLevel: defaults.defaultThinkingLevel
+						defaultThinkingLevel: defaults.defaultThinkingLevel,
+						defaultHeadroomEnabled: defaults.defaultHeadroomEnabled ?? true
 					}
 				: null
 		};

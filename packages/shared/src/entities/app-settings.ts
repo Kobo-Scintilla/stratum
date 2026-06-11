@@ -13,6 +13,9 @@ export class AppSettings {
   @Fields.string()
   defaultModelId = "deepseek-v4-flash";
 
+  @Fields.boolean()
+  defaultHeadroomEnabled = true;
+
   @Fields.string()
   defaultThinkingLevel = "medium";
 

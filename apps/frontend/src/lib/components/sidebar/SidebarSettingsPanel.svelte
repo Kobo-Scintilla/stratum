@@ -19,7 +19,9 @@
 		{ value: 'xhigh', label: 'Max' }
 	];
 	let settings = $state<AppSettings | null>(null);
-	let providerInfo = $state<Array<{ id: string; models: string[] }>>([]);
+	let providerInfo = $state<
+		Array<{ id: string; models: Array<{ id: string; contextWindow: number }> }>
+	>([]);
 	let enabledProviders = $state<Set<string>>(new Set());
 	let loaded = $state(false);
 	let modelSwitcherOpen = $state(false);
@@ -32,6 +34,7 @@
 	let defaultThinkingLevel = $derived(settings?.defaultThinkingLevel ?? 'medium');
 	let titleSummaryModelProvider = $derived(settings?.titleSummaryModelProvider ?? '');
 	let titleSummaryModelId = $derived(settings?.titleSummaryModelId ?? '');
+	let defaultHeadroomEnabled = $derived(settings?.defaultHeadroomEnabled ?? true);
 
 	const currentModelLabel = $derived(
 		defaultModelProvider && defaultModelId ? `${defaultModelProvider}:${defaultModelId}` : 'Not set'
@@ -51,15 +54,14 @@
 			: 'default'
 	);
 
-	// Only show models from providers that are configured AND enabled
 	const modelGroups = $derived(
 		providerInfo
 			.filter((p) => p.models.length > 0 && enabledProviders.has(p.id))
 			.map((p) => ({
 				provider: p.id,
 				models: p.models.map((m) => ({
-					value: `${p.id}:${m}`,
-					label: m,
+					value: `${p.id}:${m.id}`,
+					label: m.id,
 					provider: p.id
 				}))
 			}))
@@ -73,7 +75,9 @@
 		const [providers, configured, appSettings] = await Promise.all([
 			remult
 				.call(AgentService.getProvidersInfo, undefined)
-				.catch(() => [] as Array<{ id: string; models: string[] }>),
+				.catch(
+					() => [] as Array<{ id: string; models: Array<{ id: string; contextWindow: number }> }>
+				),
 			remult
 				.call(AgentService.getConfiguredProviders, undefined)
 				.catch(() => [] as Array<{ id: string; enabled: boolean; hasKey: boolean }>),
@@ -82,7 +86,7 @@
 				.findId('_defaults')
 				.catch(() => null) as Promise<AppSettings | null>
 		]);
-		providerInfo = providers as Array<{ id: string; models: string[] }>;
+		providerInfo = providers;
 		enabledProviders = new Set(
 			(configured as Array<{ id: string; enabled: boolean; hasKey: boolean }>)
 				.filter((c) => c.enabled && c.hasKey)
@@ -124,6 +128,7 @@
 					id: '_defaults',
 					defaultModelProvider: fields.defaultModelProvider ?? '',
 					defaultModelId: fields.defaultModelId ?? '',
+					defaultHeadroomEnabled: fields.defaultHeadroomEnabled ?? true,
 					defaultThinkingLevel: fields.defaultThinkingLevel ?? 'medium',
 					titleSummaryModelProvider: fields.titleSummaryModelProvider ?? '',
 					titleSummaryModelId: fields.titleSummaryModelId ?? ''
@@ -272,6 +277,33 @@
 					<span class="text-xs">{currentThinkingLabel}</span>
 				</button>
 			{/if}
+			<div class="space-y-2">
+				<span class="text-xs font-medium text-sidebar-foreground/80">Headroom Compression</span>
+				<button
+					type="button"
+					onclick={() => saveSettings({ defaultHeadroomEnabled: !defaultHeadroomEnabled })}
+					class="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs transition-colors
+					{defaultHeadroomEnabled
+						? 'border-primary/30 bg-primary/8 text-primary'
+						: 'border-border/30 bg-sidebar-accent/30 text-sidebar-foreground'}"
+				>
+					<span class="flex items-center gap-2">
+						<svg
+							class="size-3.5"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M4 14a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2z" />
+							<path d="M12 4v4" />
+							<path d="M8 18v2" />
+							<path d="M16 18v2" />
+						</svg>
+						{defaultHeadroomEnabled ? 'Enabled' : 'Disabled'}
+					</span>
+				</button>
+			</div>
 		</div>
 
 		<div class="space-y-2">

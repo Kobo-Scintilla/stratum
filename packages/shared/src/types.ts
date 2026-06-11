@@ -1,10 +1,4 @@
-import type {
-  Tool as PiAiTool,
-  Message,
-  Model,
-  Context,
-} from "@earendil-works/pi-ai";
-import type { ActiveStream } from "./entities/active-stream.js";
+import type { Tool as PiAiTool, Message, Context } from "@earendil-works/pi-ai";
 
 /** Configuration for a single agent. */
 export interface AgentConfig {
@@ -16,6 +10,7 @@ export interface AgentConfig {
   contextWindow?: number;
   /** Enable Headroom context compression. */
   headroomEnabled?: boolean;
+	thinkingLevel?: string;
 }
 
 /** A tool that an agent can call. */
@@ -38,14 +33,6 @@ export interface TrackedToolCall {
   args: unknown;
   result?: unknown;
   isError?: boolean;
-}
-
-/** Internal state for one ask() invocation. */
-interface StreamState {
-  accumulatedText: string;
-  lastWasTool: boolean;
-  toolCalls: TrackedToolCall[];
-  segments: ActiveStream["segments"];
 }
 
 export type { PiAiTool, Message, Context };

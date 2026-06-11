@@ -1,4 +1,9 @@
 import { BackendMethod, remult } from "remult";
+const CLIENT_ONLY_MESSAGE = "Not implemented client-side";
+
+function clientOnly(methodName: string): never {
+  throw new Error(`${methodName} is only implemented by the gateway backend (${CLIENT_ONLY_MESSAGE})`);
+}
 
 export class AgentService {
   @BackendMethod({ allowed: true, transactional: false })
@@ -6,7 +11,7 @@ export class AgentService {
     prompt: string,
     sessionId: string = "default",
   ): Promise<string> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("ask");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
@@ -20,22 +25,22 @@ export class AgentService {
       messageCount: number;
     }>
   > {
-    throw new Error("Not implemented client-side");
+    return clientOnly("listSessions");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async deleteSession(sessionId: string): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("deleteSession");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async renameSession(sessionId: string, title: string): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("renameSession");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async togglePinSession(sessionId: string): Promise<boolean> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("togglePinSession");
   }
 
   @BackendMethod({ allowed: true })
@@ -48,7 +53,7 @@ export class AgentService {
       createdAt: Date;
     }>
   > {
-    throw new Error("Not implemented client-side");
+    return clientOnly("recoverMessages");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
@@ -56,23 +61,23 @@ export class AgentService {
     Array<{
       id: string;
       envKeys: string[];
-      models: string[];
+      models: Array<{ id: string; contextWindow: number }>;
       isCustom: boolean;
     }>
   > {
-    throw new Error("Not implemented client-side");
+    return clientOnly("getProvidersInfo");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async getConfiguredProviders(): Promise<
     Array<{ id: string; enabled: boolean; hasKey: boolean }>
   > {
-    throw new Error("Not implemented client-side");
+    return clientOnly("getConfiguredProviders");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async saveProviderKey(id: string, apiKey: string): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("saveProviderKey");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
@@ -82,33 +87,33 @@ export class AgentService {
     baseUrl: string,
     apiType: string,
   ): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("saveCustomProvider");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async deleteProviderKey(id: string): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("deleteProviderKey");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async addProvider(id: string): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("addProvider");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async toggleProvider(id: string, enabled: boolean): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("toggleProvider");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async clearHistory(): Promise<void> {
-    throw new Error("Not implemented client-side");
+    return clientOnly("clearHistory");
   }
 
   @BackendMethod({ allowed: true, transactional: false })
   static async getProviderApiKeys(): Promise<
     Array<{ id: string; apiKey: string }>
   > {
-    throw new Error("Not implemented client-side");
+    return clientOnly("getProviderApiKeys");
   }
 }

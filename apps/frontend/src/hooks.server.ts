@@ -16,10 +16,10 @@ if (!env.ENCRYPTION_KEY) {
 	}
 	process.env.ENCRYPTION_KEY = key;
 }
-
-// Point Remult client to gateway for SSR
-remult.apiClient.url = 'http://localhost:3001/api';
-
 export const handle = async ({ event, resolve }) => {
+	// Configure Remult client for SSR using SvelteKit's patched fetch so it
+	// doesn't trigger "Avoid calling fetch eagerly" warnings.
+	remult.apiClient.url = 'http://localhost:3001/api';
+	remult.apiClient.httpClient = event.fetch;
 	return await resolve(event);
 };

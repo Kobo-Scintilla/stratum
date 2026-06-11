@@ -14,7 +14,7 @@
 	interface ProviderInfo {
 		id: string;
 		envKeys: string[];
-		models: string[];
+		models: Array<{ id: string; contextWindow: number }>;
 		isCustom: boolean;
 	}
 

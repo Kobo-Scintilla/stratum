@@ -27,10 +27,6 @@
 
 	let open = $state(false);
 
-	onMount(() => {
-		console.log('[SessionStatsWidget] mounted sessionId:', sessionId);
-	});
-
 	// ── Compression stats (from messages and active streams) ──
 	function calcCompressionStats(msgs: ChatMessage[], streams: ActiveStream[]) {
 		let saved = 0;
@@ -77,13 +73,10 @@
 			cacheW,
 			cost,
 			total: msgs.length,
-			lastCtx: last?.contextMessages ?? 0,
 			lastInput: last?.inputTokens ?? 0
 		};
 	}
-
 	let usage = $derived(calcUsageTotals(messages));
-
 	function fmtTokens(n: number): string {
 		if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
 		if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
@@ -296,18 +289,20 @@
 				<div class="grid grid-cols-2 gap-2">
 					<div class="rounded-lg border border-border/20 bg-card px-3 py-2">
 						<div class="text-[10px] tracking-wider text-muted-foreground uppercase">
-							Context Size
+							Context Used
 						</div>
 						<div class="text-sm font-semibold text-foreground tabular-nums">
-							{fmtTokens(usage.lastInput)} tokens
+							{fmtTokens(usage.lastInput)} / {fmtTokens(contextWindow)} tokens
 						</div>
 					</div>
-					<div class="rounded-lg border border-border/20 bg-card px-3 py-2">
-						<div class="text-[10px] tracking-wider text-muted-foreground uppercase">
-							Messages Included
+					<div class="rounded-lg border border-secondary/20 bg-secondary/10 px-3 py-2">
+						<div
+							class="flex items-center gap-1.5 text-[10px] tracking-wider text-muted-foreground uppercase"
+						>
+							Fill
 						</div>
 						<div class="text-sm font-semibold text-foreground tabular-nums">
-							{usage.lastCtx} / {contextWindow}
+							{Math.min(Math.max(Math.round((usage.lastInput / contextWindow) * 100), 0), 100)}%
 						</div>
 					</div>
 				</div>

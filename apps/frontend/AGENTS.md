@@ -15,8 +15,11 @@ SvelteKit 5 UI providing the chat interface, session history, provider configura
 # Work Guidance
 
 - **Components**: Group custom widgets under `src/lib/components/` (e.g. `chat/`, `sidebar/`). Use `src/lib/components/ui/` for shadcn-svelte primitives.
+- **Page Shape**: Keep route pages thin. Extract large page sections into focused components under `src/lib/components/`; pages should orchestrate loading, live sync, navigation, and callbacks.
 - **Runes**: Always use `$state`, `$derived`, `$effect`, and `$props` for state management and props.
 - **Stores**: Use Svelte 5 runes-based files under `src/lib/stores/` for client-side state.
+- **Remult live sync**: Use Remult `liveQuery` for realtime entity lists such as chat messages, active streams, and session settings; return the unsubscribe function from `$effect` cleanup.
+- **Clean Code**: Prefer readable, maintainable code over dense one-file logic or clever type gymnastics. Avoid unnecessary `any`, oversized props, and duplicated UI blocks.
 - **Path Aliases**: Use `$lib` for `src/lib/` and `@opaius/shared` for the shared library package.
 - **Icons & Typography**: Use Remixicon Svelte + Hugeicons, and Outfit Variable font.
 - **Utility**: Use the `cn()` function from `$lib/utils.ts` for styling classes combining.

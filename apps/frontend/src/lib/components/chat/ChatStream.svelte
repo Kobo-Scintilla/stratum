@@ -3,8 +3,12 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import { BotIcon } from '@hugeicons/core-free-icons';
 	import Markdown from '$lib/components/Markdown.svelte';
+	import {
+		isThoughtWorthDisplaying,
+		parseThinking,
+		parseStreamSegments
+	} from '$lib/utils/thinking.js';
 	import AgentActivity from './AgentActivity.svelte';
-	import { parseThinking, parseStreamSegments } from '$lib/utils/thinking.js';
 
 	type Segment =
 		| { type: 'text'; text: string }
@@ -38,11 +42,12 @@
 			return parseStreamSegments(stream.segments);
 		}
 		// Fallback for raw text stream
-		const blocks = parseThinking(stream.text);
 		const activities: any[] = [];
 		let content = '';
+		const blocks = parseThinking(stream.text);
 		for (const block of blocks) {
 			if (block.type === 'think') {
+				if (!isThoughtWorthDisplaying(block.text)) continue;
 				activities.push({
 					id: 'fallback-think',
 					type: 'think',

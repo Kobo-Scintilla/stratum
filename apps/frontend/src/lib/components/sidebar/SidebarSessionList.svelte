@@ -4,6 +4,7 @@
 	import { remult } from 'remult';
 	import Button from '../ui/button/button.svelte';
 	import { AgentService } from '@opaius/shared/controllers/agent-service.js';
+	import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
 	import {
 		Loading02FreeIcons,
 		MessageMultiple02FreeIcons,
@@ -29,6 +30,22 @@
 		$page.data.sessions ?? []
 	);
 	const chat = getChatSession();
+	let liveSessionSettings = $state(new Map<string, ChatSessionSettings>());
+
+	$effect(() => {
+		return remult
+			.repo(ChatSessionSettings)
+			.liveQuery({})
+			.subscribe({
+				next: (info) => {
+					const settings = new Map<string, ChatSessionSettings>();
+					for (const setting of info.items) {
+						settings.set(setting.id, setting);
+					}
+					liveSessionSettings = settings;
+				}
+			});
+	});
 
 	$effect(() => {
 		chat.sessionId;
@@ -86,18 +103,19 @@
 	}
 
 	const sessionsWithTime = $derived(
-		sessions.data.map((s) => ({
-			sessionId: s.sessionId,
-			preview: s.lastMessage,
-			title: s.title || s.lastMessage,
-			pinned: s.pinned ?? false,
-			createdAt: typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
-			messageCount: s.messageCount,
-			time: timeAgo(
-				typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString(),
-				Date.now()
-			)
-		}))
+		sessions.data.map((s) => {
+			const live = liveSessionSettings.get(s.sessionId);
+			const createdAt = typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString();
+			return {
+				sessionId: s.sessionId,
+				preview: s.lastMessage,
+				title: live?.title || s.title || s.lastMessage,
+				pinned: live?.pinned ?? s.pinned ?? false,
+				createdAt,
+				messageCount: s.messageCount,
+				time: timeAgo(createdAt, Date.now())
+			};
+		})
 	);
 
 	const filteredSessions = $derived.by(() => {

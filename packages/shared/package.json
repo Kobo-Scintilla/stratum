@@ -6,6 +6,7 @@
   "exports": {
     "./entities/*.js": "./src/entities/*.ts",
     "./types": "./src/types.ts",
+    "./types.js": "./src/types.ts",
     "./controllers/*.js": "./src/controllers/*.ts"
   },
   "scripts": {

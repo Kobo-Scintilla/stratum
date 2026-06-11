@@ -65,6 +65,22 @@ function getApiKeyEnvVars(providerId: string): string[] {
   // Fallback: convention <PROVIDER_ID>_API_KEY
   return [`${providerId.replace(/-/g, "_").toUpperCase()}_API_KEY`];
 }
+/**
+ * Resolve whether headroom compression is enabled for a session.
+ *
+ * Priority: session setting > app default > true (sensible fallback).
+ * Extracted as a pure function for testability.
+ */
+export function resolveHeadroomEnabled(
+  sessionSettings?: { headroomEnabled?: boolean } | null,
+  appSettings?: { defaultHeadroomEnabled?: boolean } | null,
+): boolean {
+  if (sessionSettings?.headroomEnabled != null)
+    return sessionSettings.headroomEnabled;
+  if (appSettings?.defaultHeadroomEnabled != null)
+    return appSettings.defaultHeadroomEnabled;
+  return true;
+}
 
 export class AgentService {
   @BackendMethod({ allowed: true, transactional: false })
@@ -91,9 +107,9 @@ export class AgentService {
         sessionSettings?.modelId ||
         appSettings?.defaultModelId ||
         baseConfig.modelId,
-      contextWindow: sessionSettings?.contextWindow ?? 20,
+      contextWindow: sessionSettings?.contextWindow ?? 0,
       thinkingLevel: sessionSettings?.thinkingLevel ?? "medium",
-      headroomEnabled: sessionSettings?.headroomEnabled ?? false,
+      headroomEnabled: resolveHeadroomEnabled(sessionSettings, appSettings),
     };
 
     // 2. Validate provider is selected
@@ -180,7 +196,7 @@ export class AgentService {
                 id: sessionId,
                 modelProvider: config.modelProvider,
                 modelId: config.modelId,
-                contextWindow: 20,
+                contextWindow: 0,
                 thinkingLevel: config.thinkingLevel ?? "medium",
                 headroomEnabled: config.headroomEnabled ?? false,
                 title: summary,
@@ -220,7 +236,10 @@ export class AgentService {
     const providers = getProviders();
     const builtins = providers.map((p) => {
       const envKeys = findEnvKeys(p) ?? [];
-      const models = getModels(p).map((m) => m.id);
+      const models = getModels(p).map((m) => ({
+        id: m.id,
+        contextWindow: m.contextWindow,
+      }));
       return {
         id: p,
         envKeys,
@@ -239,7 +258,12 @@ export class AgentService {
       .map((s) => ({
         id: s.id,
         envKeys: [`CUSTOM_${s.id}_API_KEY`],
-        models: s.models ? s.models.split(",").map((m) => m.trim()) : [],
+        models: s.models
+          ? s.models.split(",").map((m) => ({
+              id: m.trim(),
+              contextWindow: 128_000, // sensible default for unknown models
+            }))
+          : [],
         isCustom: true as const,
       }));
 
@@ -404,7 +428,7 @@ export class AgentService {
         title,
         modelProvider: "",
         modelId: "",
-        contextWindow: 20,
+        contextWindow: 0,
         thinkingLevel: "medium",
         headroomEnabled: false,
       });
@@ -423,7 +447,7 @@ export class AgentService {
         pinned: true,
         modelProvider: "",
         modelId: "",
-        contextWindow: 20,
+        contextWindow: 0,
         thinkingLevel: "medium",
         headroomEnabled: false,
       });

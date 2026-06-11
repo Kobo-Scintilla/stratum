@@ -9,11 +9,13 @@ export async function buildContext(
   config: AgentConfig,
   prompt: string,
 ): Promise<Context> {
-  const limit = config.contextWindow ?? 20;
+  // Fetch up to 200 recent messages (generous, since contextWindow now
+  // represents the model's token budget, not a message count).
+  const MAX_MESSAGES = 200;
   const prevMessages = await remult.repo(ChatMessage).find({
     where: { sessionId },
     orderBy: { sortOrder: "desc" },
-    limit,
+    limit: MAX_MESSAGES,
   });
   prevMessages.reverse();
 

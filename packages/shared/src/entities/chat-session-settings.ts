@@ -13,14 +13,15 @@ export class ChatSessionSettings {
   @Fields.string()
   modelId = "deepseek-v4-flash";
 
+  /** User override for model context window in tokens. 0 = use model default. */
   @Fields.integer()
-  contextWindow = 20;
+  contextWindow = 0;
 
   @Fields.string()
   thinkingLevel = "medium";
 
   @Fields.boolean()
-  headroomEnabled = false;
+  headroomEnabled = true;
 
   @Fields.string()
   title = "";
