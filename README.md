@@ -9,11 +9,29 @@
 
 Stratum is not another conversational wrapper. It is an agentic development runtime built on the belief that **software tools should feel premium, responsive, and mathematically sound**. We do not model AI agents after human minds; we model them as scoped, virtual engines operating within strict physical and virtual boundaries.
 
-![Stratum Architecture Diagram](./apps/frontend/static/stratum_architecture.png)
+```
+┌──────────────────────────────────────────────────────────┐
+│                      Kobo Scintilla                      │
+│                        (Desktop)                         │
+└────────────────────────────┬─────────────────────────────┘
+                             │ (SSE / Remult Client)
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│                   Stratum Hono Gateway                   │
+│         (SQLite, AES Keys, Policy-Based Outbox)          │
+└────────────────────────────┬─────────────────────────────┘
+                             │
+            ┌────────────────┴────────────────┐
+            ▼ (Local Run)                     ▼ (Remote sshfs Sync)
+┌───────────────────────┐         ┌───────────────────────┐
+│     Local Workspace   │         │    Remote Host VM     │
+│  ~/.stratum/workspace │         │    Virtual Mount      │
+└───────────────────────┘         └───────────────────────┘
+```
 
 ---
 
-## 🧠 Tiered Scoped Memory System (Mnemosyne Architecture)
+## 🧠 Tiered Scoped Memory System (Mnemosyne Architecture) [WIP]
 
 Rather than treating AI memory as a human-like stream of consciousness, Stratum segregates memory into **hierarchical, task-relevant layers**. This keeps context windows highly dense, reduces model confusion, and ensures correct scoping.
 
@@ -41,11 +59,23 @@ Rather than treating AI memory as a human-like stream of consciousness, Stratum 
 
 ---
 
-## 🌿 Visual Subagent Branches & Kanban Graph
+## 🌿 Visual Subagent Branches & Kanban Graph [WIP]
 
 Traditional Kanban boards are flat and unsuited for parallel agent task execution. Stratum visualizes operations as a **branching execution tree** representing parent-to-child subagent delegations.
 
-![Subagent Branching Memory Graph](./apps/frontend/static/subagent_branches.png)
+```mermaid
+graph TD
+    ParentAgent["Parent Agent: Main Architect"] -->|spawns| SubAgent1["Subagent A: Code Reviewer"]
+    ParentAgent -->|spawns| SubAgent2["Subagent B: DB Migrator"]
+    
+    SubAgent1 -.->|shared memory channel| SharedMem[(Shared Memory & Learnings)]
+    SubAgent2 -.->|shared memory channel| SharedMem
+    
+    style ParentAgent fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
+    style SubAgent1 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style SubAgent2 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style SharedMem fill:#0f172a,stroke:#0d9488,stroke-width:1px,color:#fff
+```
 
 * **Branching Delegation:** Watch subagents fork to run checks, compile code, or research documentation concurrently.
 * **Kanban-Graph Hybrid:** Tasks flow through columns, but remain visually linked to the parent subagent node that spawned them.
@@ -53,7 +83,7 @@ Traditional Kanban boards are flat and unsuited for parallel agent task executio
 
 ---
 
-## 📂 Mirage Virtual Filesystem
+## 📂 Mirage Virtual Filesystem [WIP]
 
 Stratum integrates external services directly into the agent's filesystem context. Instead of teaching agents complex custom APIs for email, webhooks, or Slack, Stratum mounts these services as virtual files.
 
@@ -63,7 +93,7 @@ Stratum integrates external services directly into the agent's filesystem contex
 
 ---
 
-## ⚡ Hybrid Dev Runtime & Electrobun Desktop App
+## ⚡ Hybrid Dev Runtime & Electrobun Desktop App [WIP]
 
 Stratum is designed to go wherever you develop, packaged inside a sleek desktop shell.
 
