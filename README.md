@@ -5,113 +5,136 @@
 
 ---
 
-## 🌌 The Stratum Philosophy
+## 🌌 System Architecture
 
-Stratum is not another conversational wrapper. It is an agentic development runtime built on the belief that **software tools should feel premium, responsive, and mathematically sound**. We do not model AI agents after human minds; we model them as scoped, virtual engines operating within strict physical and virtual boundaries.
+Stratum is a dual-tier agent runtime structured around a responsive client interface, a gateway coordinator, and isolated execution workspaces.
 
+```mermaid
+graph TB
+    Client["Kobo Scintilla UI<br>(SvelteKit 5 / Electrobun)"]
+    Gateway["Stratum Hono Gateway<br>(SQLite, AES Key-Store)"]
+    
+    subgraph Workspaces ["Execution Boundaries"]
+        Local["Local Workspace<br>(~/.stratum/workspace)"]
+        Remote["Remote Host VM<br>(SSHFS / SSH Sync Mount)"]
+    end
+
+    Client <-->|SSE & Remult Client| Gateway
+    Gateway <-->|Tool Runner CWD| Local
+    Gateway <-->|VFS Sync| Remote
+    
+    style Client fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
+    style Gateway fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style Local fill:#0f172a,stroke:#0d9488,stroke-dasharray: 5 5,color:#fff
+    style Remote fill:#0f172a,stroke:#a855f7,stroke-dasharray: 5 5,color:#fff
 ```
-┌──────────────────────────────────────────────────────────┐
-│                      Kobo Scintilla                      │
-│                        (Desktop)                         │
-└────────────────────────────┬─────────────────────────────┘
-                             │ (SSE / Remult Client)
-                             ▼
-┌──────────────────────────────────────────────────────────┐
-│                   Stratum Hono Gateway                   │
-│         (SQLite, AES Keys, Policy-Based Outbox)          │
-└────────────────────────────┬─────────────────────────────┘
-                             │
-            ┌────────────────┴────────────────┐
-            ▼ (Local Run)                     ▼ (Remote sshfs Sync)
-┌───────────────────────┐         ┌───────────────────────┐
-│     Local Workspace   │         │    Remote Host VM     │
-│  ~/.stratum/workspace │         │    Virtual Mount      │
-└───────────────────────┘         └───────────────────────┘
-```
+
+* **Frontend Client:** Built using Svelte 5 and SvelteKit, executing inside an Electrobun window wrapper for local system integration, hotkeys, and shell hooks.
+* **Hono Gateway:** Acts as the central agent execution loop, session coordinator, and key-management container.
+* **Execution Workspace:** The agent's file tools and terminal processes are restricted to `~/.stratum/workspace` (locally) or virtual mount points (remotely).
 
 ---
 
-## 🧠 Tiered Scoped Memory System (Mnemosyne Architecture) [WIP]
+## 🧠 Tiered Scoped Memory Architecture (Mnemosyne)
 
-Rather than treating AI memory as a human-like stream of consciousness, Stratum segregates memory into **hierarchical, task-relevant layers**. This keeps context windows highly dense, reduces model confusion, and ensures correct scoping.
-
-```
-                      [ GLOBAL GENERAL MEMORY ]
-                       - System settings & APIs
-                                  │
-                                  ▼
-                     [ PROJECT-LEVEL MEMORY ]
-                      - Repository mappings & APIs
-                                  │
-                                  ▼
-                     [ AGENT-SPECIFIC MEMORY ]
-                      - Tool profiles & specializations
-                                  │
-                                  ▼
-                      [ TASK / SESSION MEMORY ]
-                       - Git checkpoints & active loops
-```
-
-* **Global Memory:** Universal user preferences, API access permissions, and cross-session learnings.
-* **Project Memory:** Codebase structure maps, local documentation, code-splitting rules, and architectural guidelines (e.g., `AGENTS.md`).
-* **Agent-Type Memory:** Specific specialized capabilities, fine-tuned developer prompts, and tool access boundaries.
-* **Task/Session Memory:** Ephemeral context, git checkpoint hashes, active compiler outputs, and short-term reasoning traces.
-
----
-
-## 🌿 Visual Subagent Branches & Kanban Graph [WIP]
-
-Traditional Kanban boards are flat and unsuited for parallel agent task execution. Stratum visualizes operations as a **branching execution tree** representing parent-to-child subagent delegations.
+Memory in Stratum is structured hierarchically to restrict context pollution and maximize prompt precision. Rather than a flat text log, context is assembled dynamically from four scoped layers.
 
 ```mermaid
 graph TD
-    ParentAgent["Parent Agent: Main Architect"] -->|spawns| SubAgent1["Subagent A: Code Reviewer"]
-    ParentAgent -->|spawns| SubAgent2["Subagent B: DB Migrator"]
+    Global["1. Global Memory<br>(User Prefs, API keys)"] --> Project["2. Project Memory<br>(Codebase Maps, AGENTS.md)"]
+    Project --> Agent["3. Agent-Type Memory<br>(Tool profiles, Prompts)"]
+    Agent --> Session["4. Session / Task Memory<br>(Local Git diffs, Traces)"]
     
-    SubAgent1 -.->|shared memory channel| SharedMem[(Shared Memory & Learnings)]
-    SubAgent2 -.->|shared memory channel| SharedMem
-    
-    style ParentAgent fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
-    style SubAgent1 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
-    style SubAgent2 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
-    style SharedMem fill:#0f172a,stroke:#0d9488,stroke-width:1px,color:#fff
+    style Global fill:#1e293b,stroke:#0d9488,color:#fff
+    style Project fill:#1e293b,stroke:#3b82f6,color:#fff
+    style Agent fill:#1e293b,stroke:#8b5cf6,color:#fff
+    style Session fill:#1e293b,stroke:#ec4899,color:#fff
 ```
 
-* **Branching Delegation:** Watch subagents fork to run checks, compile code, or research documentation concurrently.
-* **Kanban-Graph Hybrid:** Tasks flow through columns, but remain visually linked to the parent subagent node that spawned them.
-* **Shared Learnings Channel:** Subagents in the same branch sync updates and execution learnings instantly to prevent repetitive steps.
+* **Global Memory:** Contains cross-session learnings, user preferences, and encrypted API configurations.
+* **Project Memory:** Defines codebase paths, directories, libraries, and active structural conventions parsed from root `AGENTS.md` files.
+* **Agent-Type Memory:** Scopes what tools the agent can execute (e.g. read-only, FS mutations, network calls).
+* **Session/Task Memory:** Holds active terminal buffers, tool outputs, and transient compiler warnings.
 
 ---
 
-## 📂 Mirage Virtual Filesystem [WIP]
+## 🌿 Subagent Branching Graph & Kanban UI
 
-Stratum integrates external services directly into the agent's filesystem context. Instead of teaching agents complex custom APIs for email, webhooks, or Slack, Stratum mounts these services as virtual files.
+Subagent execution is modeled as a directed acyclic graph (DAG) representing parent-to-child delegation trees, synced with a branching Kanban workspace.
 
-* **Emails as Files:** Reading an incoming email is as simple as running `read("/mount/mirage/emails/inbox/mail_104.md")`.
-* **Outbox Actions:** Sending an email or webhook is triggered by writing a file to `/mount/mirage/emails/outbox/`.
-* **API Uniformity:** Agents can run standard Unix tools (`grep`, `find`, `cat`) over Slack messages, databases, and emails, unifying all data streams.
+```mermaid
+graph TD
+    Parent["Parent Architect Agent"] -->|delegates task| ChildA["Subagent A: Code Reviewer"]
+    Parent -->|delegates task| ChildB["Subagent B: Migrator"]
+    
+    ChildA -.->|sync channel| Shared[(Shared Learning Pool)]
+    ChildB -.->|sync channel| Shared
+    
+    style Parent fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
+    style ChildA fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style ChildB fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+    style Shared fill:#0f172a,stroke:#3b82f6,color:#fff
+```
+
+* **Execution Graph:** Nodes represent individual subagents. Spawned subagents inherit parent context and tool subsets.
+* **Shared Learning Pool:** Subagents operating in parallel branches stream structural discoveries (e.g., locating a file, identifying an API bug) to a shared pool to prevent double-work.
 
 ---
 
-## ⚡ Hybrid Dev Runtime & Electrobun Desktop App [WIP]
+## 📂 Mirage Virtual Filesystem
 
-Stratum is designed to go wherever you develop, packaged inside a sleek desktop shell.
+Stratum uses Mirage to virtualize integrations. Instead of creating custom tools for Slack, Gmail, GitHub, or Postgres, external services are mounted directly as virtual directories.
 
-* **Electrobun Desktop Wrapper:** A high-performance, lightweight Chromium/Webkit container wrapping the SvelteKit frontend and Hono gateway, providing deep system access, custom hotkeys, and menu controls.
-* **Local-to-Remote Hot Swap:** Switch from running agents locally in `~/.stratum/workspace` to remote execution environments in one click.
-* **Virtual SSHFS Sync:** Connect to remote virtual machines, cloud sandboxes, or production testing servers. Files are automatically synchronized under the hood, presenting a local-first interface to both user and agent.
-* **DeepResearch mode:** Spawns specialized crawling agents to run broad web searches, crawl API docs, and build context before proposing code edits.
+```mermaid
+graph LR
+    Agent[Agent File Tools] -->|read / write / grep| Mount["/mount/mirage/"]
+    
+    subgraph Mirage VFS ["Mirage Virtual Filesystem"]
+        Mount --> Gmail["/emails/inbox/"]
+        Mount --> Slack["/slack/channels/"]
+        Mount --> Git["/github/prs/"]
+        Mount --> DB["/postgres/tables/"]
+    end
+    
+    style Agent fill:#1e293b,stroke:#0d9488,color:#fff
+    style Mount fill:#0f172a,stroke:#a855f7,color:#fff
+```
+
+* **Unified Input/Output:** Agents inspect emails by reading `/mount/mirage/emails/inbox/` and send responses by writing to `/mount/mirage/emails/outbox/`.
+* **Standard Tooling:** The agent searches Slack history or database schemas using standard shell `grep` and file reading commands, completely avoiding API code wrappers.
+
+---
+
+## ⚡ Hybrid Dev Runtime & Electrobun Desktop App
+
+Stratum provides seamless switching between local execution and remote hosting using a virtual sync mechanism.
+
+* **Electrobun Desktop Wrapper:** A high-performance native desktop shell hosting the Svelte 5 frontend and spawning the gateway server.
+* **SSHFS Sync:** Mounts remote development servers, Docker containers, or staging host VMs. Files are synchronized in real-time, allowing the local agent to edit and run compilers remotely.
+* **DeepResearch mode:** Spawns specialized crawling agents to perform concurrent web searches, index API documentations, and ingest remote code examples.
 
 ---
 
 ## 🛡️ Reversibility-Based Safety Gates (RBAG)
 
-To protect your system while keeping developer momentum high, Stratum utilizes the **RBAG** model:
+To protect host systems while maintaining execution velocity, Stratum implements the **RBAG** safety gate workflow:
 
-1. **Pre-Execution Checkpoint:** Before the agent runs any write or terminal tool inside `~/.stratum/workspace`, a silent Git checkpoint is generated.
-2. **Auto-Run Execution:** The agent writes the code and compiles the project without intermediate confirmation prompts.
-3. **One-Click Rollback:** If the compilation fails or code is incorrect, click `[Rollback Changes]` in the UI to reset the workspace to the pre-execution checkpoint, fully restoring your original dirty files and deleting new untracked agent files.
-4. **Auto-Finalization:** Once you send a new prompt, past checkpoints are cleanly merged and finalized.
+1. **Pre-Execution Checkpoint:** Before write or terminal tools execute, the gateway creates a Git checkpoint in `~/.stratum/workspace` (committing dirty files silently if present).
+2. **Auto-Run Mode:** The agent modifies codebase files and runs compilers without intermediate prompting.
+3. **Rollback Hook:** Users can click `[Rollback Changes]` in the UI to instantly revert modifications to the pre-tool state, deleting untracked files and unstaging the original modifications.
+4. **Auto-Finalization:** Starting a new generation turn soft-resets the past checkpoint, merging both edits into the unstaged working tree.
+
+---
+
+## 🚧 Active Roadmap & Work In Progress (WIP)
+
+While the core Hono Gateway, Svelte 5 UI, and RBAG Git Checkpoint system are fully implemented and verified, the following features are actively under development:
+
+* **Mnemosyne Memory System:** The gateway currently uses single-history context building; the tiered scoped layers are in active R&D.
+* **Subagent Kanban UI:** Subagents can be defined and spawned manually; the branching visual board interface is not yet wired to the frontend.
+* **Mirage VFS:** Virtual mounts for email, Slack, and databases are in mock mode; the FUSE/passthrough filesystem layer is under construction.
+* **Electrobun Packaging:** Currently runs locally via terminal node servers; native Electrobun desktop packaging is in compilation trials.
+* **Remote SSHFS Sync:** SSH remote VM file synchronizer is WIP.
 
 ---
 
