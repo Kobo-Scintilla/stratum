@@ -1,10 +1,3 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Kobo-Scintilla/stratum/raw/main/apps/frontend/static/logo.png">
-    <img src="https://github.com/Kobo-Scintilla/stratum/raw/main/apps/frontend/static/logo.png" alt="Stratum" width="120">
-  </picture>
-</p>
-
 <h1 align="center">Stratum</h1>
 
 <p align="center">
