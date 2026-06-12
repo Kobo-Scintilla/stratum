@@ -9,10 +9,16 @@
 	let { chat }: { chat: ChatSession } = $props();
 
 	let viewport: HTMLElement | null = $state(null);
+	let isNearBottom = true;
 	let lastScrollHeight = 0;
 
 	function handleScroll() {
-		if (!viewport || chat.isLoadingMore || !chat.hasMore) return;
+		if (!viewport) return;
+
+		const threshold = 100;
+		isNearBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < threshold;
+
+		if (chat.isLoadingMore || !chat.hasMore) return;
 		if (viewport.scrollTop < 80 && !chat.isSending) {
 			lastScrollHeight = viewport.scrollHeight;
 			const extra = Math.max(20, Math.ceil(viewport.clientHeight / 140));
@@ -39,7 +45,7 @@
 					const diff = viewport!.scrollHeight - lastScrollHeight;
 					viewport!.scrollTop = diff;
 					lastScrollHeight = 0;
-				} else {
+				} else if (isNearBottom || chat.isSending) {
 					viewport!.scrollTop = viewport!.scrollHeight;
 				}
 			});
@@ -47,8 +53,11 @@
 	});
 </script>
 
-<ScrollArea.Root class="flex-1 px-4 pr-16" bind:viewportRef={viewport}>
-	<div class="mx-auto flex max-w-2xl flex-col gap-4 py-4">
+<ScrollArea.Root
+	class="min-h-0 flex-1 overflow-hidden px-4 pr-4 md:pr-16"
+	bind:viewportRef={viewport}
+>
+	<div class="mx-auto flex max-w-4xl min-w-0 flex-col gap-4 py-4">
 		{#if chat.displayMessages.length === 0 && chat.activeStreams.length === 0 && !chat.isSending}
 			<EmptyState />
 		{/if}

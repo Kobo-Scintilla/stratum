@@ -10,7 +10,10 @@ export interface AgentConfig {
   contextWindow?: number;
   /** Enable Headroom context compression. */
   headroomEnabled?: boolean;
-	thinkingLevel?: string;
+  headroomCodeAst?: boolean;
+  headroomKompressModel?: string;
+  headroomCcr?: boolean;
+  thinkingLevel?: string;
 }
 
 /** A tool that an agent can call. */

@@ -22,13 +22,11 @@ export interface HeadroomConfig {
   modelId?: string;
   /** Token budget — compress to fit within this limit. */
   contextWindow?: number;
+  contentRouterEnabled?: boolean;
+  summarizationEnabled?: boolean;
+  summarizationModel?: string | null;
+  ccrEnabled?: boolean;
 }
-
-const HEADROOM_CLIENT = new HeadroomClient({
-  baseUrl: BASE_URL,
-  fallback: true,
-  timeout: 15_000,
-});
 
 // ─── Public API ───────────────────────────────────────────────────────
 
@@ -62,8 +60,24 @@ export async function compressContext(
   if (openaiMessages.length === 0) return null;
 
   try {
+    const client = new HeadroomClient({
+      baseUrl: BASE_URL,
+      fallback: true,
+      timeout: 15_000,
+      config: {
+        contentRouterEnabled: config.contentRouterEnabled,
+        intelligentContext: {
+          summarizationEnabled: config.summarizationEnabled,
+          summarizationModel: config.summarizationModel,
+        },
+        ccr: {
+          enabled: config.ccrEnabled,
+        },
+      },
+    });
+
     const result: CompressResult = await compress(openaiMessages, {
-      client: HEADROOM_CLIENT,
+      client,
       ...(config.modelId ? { model: config.modelId } : {}),
       ...(config.contextWindow && config.contextWindow > 0
         ? { tokenBudget: config.contextWindow }

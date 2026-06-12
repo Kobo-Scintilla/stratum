@@ -31,10 +31,7 @@ import type {
   ImageContent,
   ToolCall as PiToolCall,
 } from "@earendil-works/pi-ai";
-import type {
-  OpenAIMessage,
-  ToolCall as OpenAIToolCall,
-} from "headroom-ai";
+import type { OpenAIMessage, ToolCall as OpenAIToolCall } from "headroom-ai";
 
 // ─── Pi-AI → OpenAI ──────────────────────────────────────────────────
 
@@ -164,22 +161,58 @@ export function openAIToPi(
   original: Message[],
   systemPrompt?: string,
 ): Message[] {
-  // Adjust for prepended system message — headroom may keep or drop it
-  let origIdx = 0;
-  if (systemPrompt) {
-    // Skip past system message in compressed if first message is system
-    if (compressed.length > 0 && compressed[0].role === "system") {
-      origIdx = 0; // system not in original messages array
-    }
-  }
+  const filtered = compressed.filter((m) => m.role !== "system");
+  let lastOrigIdx = -1;
 
-  return compressed
-    .filter((m) => m.role !== "system") // strip system if present
-    .map((compMsg, i) => {
-      const orig = original[i];
-      if (orig) return alignMessage(compMsg, orig);
-      return buildFresh(compMsg);
-    });
+  return filtered.map((compMsg) => {
+    let orig: Message | undefined;
+
+    // 1. Precise match for tool message
+    if (compMsg.role === "tool") {
+      const tcId = compMsg.tool_call_id;
+      const idx = original.findIndex(
+        (o) => o.role === "toolResult" && o.toolCallId === tcId,
+      );
+      if (idx !== -1) {
+        orig = original[idx];
+        lastOrigIdx = idx;
+      }
+    }
+    // 2. Precise match for assistant message with tool calls
+    else if (
+      compMsg.role === "assistant" &&
+      (compMsg as any).tool_calls &&
+      (compMsg as any).tool_calls.length > 0
+    ) {
+      const tcId = (compMsg as any).tool_calls[0].id;
+      const idx = original.findIndex(
+        (o) =>
+          o.role === "assistant" &&
+          o.content.some((p) => p.type === "toolCall" && p.id === tcId),
+      );
+      if (idx !== -1) {
+        orig = original[idx];
+        lastOrigIdx = idx;
+      }
+    }
+
+    // 3. Fallback: sequential role match
+    if (!orig) {
+      const targetRole = compMsg.role === "tool" ? "toolResult" : compMsg.role;
+      const idx = original.findIndex(
+        (o, oIdx) => oIdx > lastOrigIdx && o.role === targetRole,
+      );
+      if (idx !== -1) {
+        orig = original[idx];
+        lastOrigIdx = idx;
+      }
+    }
+
+    if (orig) {
+      return alignMessage(compMsg, orig);
+    }
+    return buildFresh(compMsg);
+  });
 }
 
 function alignMessage(comp: OpenAIMessage, orig: Message): Message {

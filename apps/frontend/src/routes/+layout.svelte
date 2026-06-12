@@ -3,16 +3,11 @@
 	import { Toaster } from '$lib/components/ui/sonner/index.js';
 	import { remult, Remult } from 'remult';
 	import { createSubscriber } from 'svelte/reactivity';
-	import { createNavState } from '$lib/stores/nav-state.svelte.js';
-
-	let { children, data } = $props();
-
-	// SSR-safe nav state — initialised from cookie (data.activeTab)
-	// Falls back to localStorage on client for repeat visits
-	createNavState(() => data.activeTab);
+	import { browser } from '$app/environment';
+	let { children } = $props();
 
 	// ── Remult Svelte 5 reactivity ─────────────────────────────────
-	{
+	if (browser) {
 		let update = () => {};
 		let s = createSubscriber((u) => {
 			update = u;
@@ -28,9 +23,7 @@
 		};
 
 		// Point Remult client to gateway (matches hooks.server.ts for client side)
-		if (import.meta.env.SSR === false) {
-			remult.apiClient.url = 'http://localhost:3001/api';
-		}
+		remult.apiClient.url = 'http://localhost:3001/api';
 	}
 </script>
 

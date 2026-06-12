@@ -4,6 +4,7 @@ import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
 import { ActiveStream } from '@opaius/shared/entities/active-stream.js';
 import { AgentService } from '@opaius/shared/controllers/agent-service.js';
 import { isThoughtWorthDisplaying, parseThinking } from '$lib/utils/thinking.js';
+import { safeRandomUUID } from '$lib/utils/uuid.js';
 const INITIAL_MESSAGE_LIMIT = 50;
 const MIN_MORE_MESSAGES = 20;
 const ESTIMATED_MESSAGE_HEIGHT = 150;
@@ -32,11 +33,12 @@ export interface EnrichedMessage {
 	cacheReadTokens?: number;
 	cacheWriteTokens?: number;
 	contextMessages?: number;
+	isFinal?: boolean;
 }
 
 // ── Helper: group messages, thinking, and tool results ──
 
-function getDisplayMessages(msgs: ChatMessage[]): EnrichedMessage[] {
+function getDisplayMessages(msgs: ChatMessage[], streams: ActiveStream[] = []): EnrichedMessage[] {
 	const results = new Map<string, { result: string; isError: boolean }>();
 	for (const m of msgs) {
 		if (m.role === 'tool' && m.toolCallId) {
@@ -48,6 +50,7 @@ function getDisplayMessages(msgs: ChatMessage[]): EnrichedMessage[] {
 	}
 
 	const displayMsgs: EnrichedMessage[] = [];
+	let lastAssistantMsg: EnrichedMessage | null = null;
 
 	for (const m of msgs) {
 		if (m.role === 'tool') {
@@ -60,60 +63,107 @@ function getDisplayMessages(msgs: ChatMessage[]): EnrichedMessage[] {
 				role: 'user',
 				content: m.content
 			});
+			lastAssistantMsg = null;
 			continue;
 		}
 
 		const blocks = parseThinking(m.content);
-		const display: EnrichedMessage = {
-			id: m.id,
-			role: 'assistant',
-			content: '',
-			activities: [],
-			headroomTokensSaved: 0,
-			headroomRatio: 1,
-			inputTokens: 0,
-			outputTokens: 0,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
-			contextMessages: 0
-		};
 
-		for (const block of blocks) {
-			if (block.type === 'think') {
-				if (!isThoughtWorthDisplaying(block.text)) continue;
-				display.activities!.push({
-					id: crypto.randomUUID(),
-					type: 'think',
-					text: block.text
-				});
-			} else if (block.type === 'text') {
-				display.content = block.text;
+		// Group into existing block if it has no text update yet
+		if (lastAssistantMsg && lastAssistantMsg.content.trim() === '') {
+			for (const block of blocks) {
+				if (block.type === 'think') {
+					if (isThoughtWorthDisplaying(block.text)) {
+						lastAssistantMsg.activities!.push({
+							id: safeRandomUUID(),
+							type: 'think',
+							text: block.text
+						});
+					}
+				} else if (block.type === 'text') {
+					lastAssistantMsg.content += block.text;
+				}
 			}
-		}
 
-		if (m.toolCalls && m.toolCalls.length > 0) {
-			for (const tc of m.toolCalls) {
-				display.activities!.push({
-					id: tc.id,
-					type: 'tool',
-					name: tc.name,
-					args: tc.args,
-					result: results.get(tc.id) ?? null,
-					isError: results.get(tc.id)?.isError ?? false
-				});
+			if (m.toolCalls && m.toolCalls.length > 0) {
+				for (const tc of m.toolCalls) {
+					lastAssistantMsg.activities!.push({
+						id: tc.id,
+						type: 'tool',
+						name: tc.name,
+						args: tc.args,
+						result: results.get(tc.id) ?? null,
+						isError: results.get(tc.id)?.isError ?? false
+					});
+				}
 			}
-		}
 
-		display.headroomTokensSaved = m.headroomTokensSaved ?? 0;
-		if (m.headroomTokensSaved && m.headroomTokensSaved > 0) {
-			display.headroomRatio = m.headroomRatio ?? 1;
+			lastAssistantMsg.inputTokens = (lastAssistantMsg.inputTokens ?? 0) + (m.inputTokens ?? 0);
+			lastAssistantMsg.outputTokens = (lastAssistantMsg.outputTokens ?? 0) + (m.outputTokens ?? 0);
+			lastAssistantMsg.cacheReadTokens =
+				(lastAssistantMsg.cacheReadTokens ?? 0) + (m.cacheReadTokens ?? 0);
+			lastAssistantMsg.cacheWriteTokens =
+				(lastAssistantMsg.cacheWriteTokens ?? 0) + (m.cacheWriteTokens ?? 0);
+			lastAssistantMsg.headroomTokensSaved =
+				(lastAssistantMsg.headroomTokensSaved ?? 0) + (m.headroomTokensSaved ?? 0);
+			if (m.headroomRatio && m.headroomRatio < 1) {
+				lastAssistantMsg.headroomRatio = m.headroomRatio;
+			}
+		} else {
+			const display: EnrichedMessage = {
+				id: m.id,
+				role: 'assistant',
+				content: '',
+				activities: [],
+				headroomTokensSaved: m.headroomTokensSaved ?? 0,
+				headroomRatio: m.headroomRatio ?? 1,
+				inputTokens: m.inputTokens ?? 0,
+				outputTokens: m.outputTokens ?? 0,
+				cacheReadTokens: m.cacheReadTokens ?? 0,
+				cacheWriteTokens: m.cacheWriteTokens ?? 0,
+				contextMessages: m.contextMessages ?? 0
+			};
+
+			for (const block of blocks) {
+				if (block.type === 'think') {
+					if (isThoughtWorthDisplaying(block.text)) {
+						display.activities!.push({
+							id: safeRandomUUID(),
+							type: 'think',
+							text: block.text
+						});
+					}
+				} else if (block.type === 'text') {
+					display.content += block.text;
+				}
+			}
+
+			if (m.toolCalls && m.toolCalls.length > 0) {
+				for (const tc of m.toolCalls) {
+					display.activities!.push({
+						id: tc.id,
+						type: 'tool',
+						name: tc.name,
+						args: tc.args,
+						result: results.get(tc.id) ?? null,
+						isError: results.get(tc.id)?.isError ?? false
+					});
+				}
+			}
+
+			displayMsgs.push(display);
+			lastAssistantMsg = display;
 		}
-		display.inputTokens = m.inputTokens ?? 0;
-		display.outputTokens = m.outputTokens ?? 0;
-		display.cacheReadTokens = m.cacheReadTokens ?? 0;
-		display.cacheWriteTokens = m.cacheWriteTokens ?? 0;
-		display.contextMessages = m.contextMessages ?? 0;
-		displayMsgs.push(display);
+	}
+
+	// Flag which assistant blocks are the final ones
+	const hasActiveStream = streams.length > 0;
+	for (let i = 0; i < displayMsgs.length; i++) {
+		if (displayMsgs[i].role === 'assistant') {
+			const isLast = i === displayMsgs.length - 1;
+			const followedByUser = !isLast && displayMsgs[i + 1].role === 'user';
+			displayMsgs[i].isFinal = (isLast && !hasActiveStream) || followedByUser;
+		}
 	}
 
 	return displayMsgs;
@@ -173,8 +223,6 @@ export function createChatSession(
 	let currentLimit = $state(INITIAL_MESSAGE_LIMIT);
 	let hasMore = $state(false);
 
-	// Display messages derived from raw messages
-	let displayMessages = $derived(getDisplayMessages(messages));
 	let unsubs: (() => void)[] = [];
 
 	function messagesPerViewport(): number {
@@ -255,7 +303,7 @@ export function createChatSession(
 			return messages;
 		},
 		get displayMessages() {
-			return displayMessages;
+			return getDisplayMessages(messages, activeStreams);
 		},
 		get activeStreams() {
 			return activeStreams;
@@ -295,7 +343,7 @@ export function createChatSession(
 		async send(prompt: string) {
 			let sid = sessionId;
 			if (!sid) {
-				sid = crypto.randomUUID();
+				sid = safeRandomUUID();
 				sessionId = sid;
 				await subscribe(sid, currentLimit);
 			}

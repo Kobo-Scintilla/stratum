@@ -97,13 +97,13 @@
 <button
 	type="button"
 	onclick={() => (open = !open)}
-	class="fixed top-1/2 right-3 z-50 flex
-		h-14 w-6 -translate-y-1/2
-		cursor-pointer items-center justify-center rounded-l-lg border
-		border-r-0 border-border/60 bg-card text-foreground shadow-lg
-		backdrop-blur-2xl transition-transform duration-200 ease-linear
-		hover:bg-white/5
-		focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none
+	class="fixed top-1/2 right-3 z-50 flex h-14
+		w-6 -translate-y-1/2 cursor-pointer
+		items-center justify-center rounded-l-lg border border-r-0
+		border-border/60 bg-card text-foreground shadow-lg backdrop-blur-2xl
+		transition-transform duration-200 ease-linear hover:bg-white/5
+		focus-visible:ring-2
+		focus-visible:ring-ring focus-visible:outline-none max-sm:hidden
 		{open ? 'translate-x-[-320px]' : ''}"
 	aria-label="{open ? 'Close' : 'Open'} session stats"
 >
@@ -115,9 +115,9 @@
 </button>
 <!-- Widget panel — always in DOM, transitions like shadcn sidebar -->
 <div
-	class="fixed inset-y-3 right-3 z-40 flex w-80 flex-col
-		rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-3xl
-		transition-transform duration-200 ease-linear
+	class="fixed inset-y-3 right-3 z-40 flex w-80 flex-col rounded-2xl
+		border border-border/60 bg-card/95 shadow-2xl backdrop-blur-3xl transition-transform
+		duration-200 ease-linear max-sm:hidden
 		{open ? 'translate-x-0' : 'translate-x-[calc(100%+16px)]'}"
 >
 	<!-- Header -->

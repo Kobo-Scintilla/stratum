@@ -32,7 +32,7 @@
 </script>
 
 <div
-	class="mx-auto max-w-lg rounded-2xl border border-border/60 bg-card px-3 py-2.5 shadow-xl transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20"
+	class="mx-auto max-w-4xl rounded-2xl border border-border/60 bg-card px-3 py-2.5 shadow-xl transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20"
 >
 	<form
 		class="flex items-center gap-2"
@@ -54,6 +54,6 @@
 		</Button>
 	</form>
 	{#if error}
-		<p class="mx-auto mt-1.5 max-w-2xl text-xs text-destructive">{error}</p>
+		<p class="mx-auto mt-1.5 max-w-4xl text-xs text-destructive">{error}</p>
 	{/if}
 </div>

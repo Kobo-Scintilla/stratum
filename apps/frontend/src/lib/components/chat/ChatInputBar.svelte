@@ -117,7 +117,11 @@
 		ctxLastRawMsg = messages.filter((m) => m.role === 'assistant').slice(-1)[0] ?? null;
 	});
 	const ctxTokens = $derived(ctxLastRawMsg?.inputTokens ?? 0);
-	const ctxWindow = $derived(selectedModel?.contextWindow ?? 1_000_000);
+	const ctxWindow = $derived(
+		sessionSettings?.contextWindow && sessionSettings.contextWindow > 0
+			? sessionSettings.contextWindow
+			: (selectedModel?.contextWindow ?? 1_000_000)
+	);
 	const ctxPct = $derived(Math.min(Math.max(Math.round((ctxTokens / ctxWindow) * 100), 0), 100));
 </script>
 
@@ -149,7 +153,14 @@
 					<path d="M6 9l6 6 6-6" />
 				</svg>
 			</Popover.Trigger>
-			<Popover.Content side="top" sideOffset={6} align="end" class="w-80 p-0">
+			<Popover.Content
+				side="top"
+				sideOffset={6}
+				align="end"
+				class="w-80 p-0"
+				onOpenAutoFocus={(e) => e.preventDefault()}
+				onCloseAutoFocus={(e) => e.preventDefault()}
+			>
 				<Command.Root value={activeValue}>
 					<Command.Input placeholder="Search models..." />
 					<Command.List class="max-h-[min(60vh,28rem)]">
@@ -200,7 +211,14 @@
 					<path d="M6 9l6 6 6-6" />
 				</svg>
 			</Popover.Trigger>
-			<Popover.Content side="top" sideOffset={6} align="end" class="w-44 p-0">
+			<Popover.Content
+				side="top"
+				sideOffset={6}
+				align="end"
+				class="w-44 p-0"
+				onOpenAutoFocus={(e) => e.preventDefault()}
+				onCloseAutoFocus={(e) => e.preventDefault()}
+			>
 				<Command.Root value={currentThinkingLevel}>
 					<Command.List>
 						<Command.Group heading="Thinking Level">
@@ -252,7 +270,7 @@
 
 	{#if sessionId || hasActiveProviders}
 		<div
-			class="mx-auto mt-2 flex w-fit max-w-2xl items-center justify-end gap-2 rounded-xl border border-border/20 bg-black/5 px-3 py-1.5 whitespace-nowrap backdrop-blur-2xl"
+			class="mx-auto mt-2 flex w-full flex-wrap items-center justify-center gap-2 rounded-xl border border-border/20 bg-black/5 px-3 py-1.5 backdrop-blur-2xl sm:w-fit sm:flex-nowrap sm:justify-end"
 		>
 			{@render headroomToggle()}
 			{@render thinkingSelector()}

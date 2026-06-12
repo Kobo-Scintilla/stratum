@@ -27,17 +27,16 @@
 			.join(' ');
 	}
 
-	const unconfigured = $derived(providers.filter((p) => !configuredIds.has(p.id)));
+	const unconfigured = () => providers.filter((p) => !configuredIds.has(p.id));
 
-	const filtered = $derived(
+	const filtered = () =>
 		query.trim()
-			? unconfigured.filter(
+			? unconfigured().filter(
 					(p) =>
 						p.id.toLowerCase().includes(query.toLowerCase()) ||
 						p.models.some((m) => m.id.toLowerCase().includes(query.toLowerCase()))
 				)
-			: unconfigured
-	);
+			: unconfigured();
 
 	function handleSelect(id: string) {
 		onadd?.(id);
@@ -96,9 +95,9 @@
 	>
 		<Command.Root>
 			<Command.List>
-				{#if filtered.length > 0}
+				{#if filtered().length > 0}
 					<Command.Group>
-						{#each filtered as p (p.id)}
+						{#each filtered() as p (p.id)}
 							<Command.Item value={p.id} onclick={() => handleSelect(p.id)}>
 								<div class="flex flex-col gap-0">
 									<span class="text-xs font-medium">{formatName(p.id)}</span>

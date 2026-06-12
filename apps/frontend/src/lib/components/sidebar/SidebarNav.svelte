@@ -1,19 +1,21 @@
 <script lang="ts">
-	import { navTopItems, navBottomItems, useNavState } from '$lib/stores/nav-state.svelte.js';
+	import {
+		navTopItems,
+		navBottomItems,
+		useDashboardState
+	} from '$lib/stores/dashboard-state.svelte.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import Icon from '../Icon.svelte';
 
 	const sidebar = useSidebar();
-	const nav = useNavState();
+	const dashboard = useDashboardState();
 
 	function onNavClick(id: string) {
-		const wasActive = nav.current === id;
-		nav.toggle(id as any);
+		const wasActive = dashboard.activeTab === id;
+		dashboard.toggleTab(id as any);
 		if (wasActive) {
-			sidebar.setOpen(false);
-		} else {
-			sidebar.setOpen(true);
+			sidebar.toggle();
 		}
 	}
 </script>
@@ -27,7 +29,7 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								tooltipContent={item.title}
-								isActive={nav.current === item.id}
+								isActive={dashboard.activeTab === item.id}
 								class="px-2.5 md:px-2"
 								onclick={() => onNavClick(item.id)}
 							>
@@ -48,7 +50,7 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								tooltipContent={item.title}
-								isActive={nav.current === item.id}
+								isActive={dashboard.activeTab === item.id}
 								class="px-2.5 md:px-2"
 								onclick={() => onNavClick(item.id)}
 							>

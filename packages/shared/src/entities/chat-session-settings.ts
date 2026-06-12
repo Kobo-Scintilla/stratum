@@ -23,6 +23,15 @@ export class ChatSessionSettings {
   @Fields.boolean()
   headroomEnabled = true;
 
+  @Fields.boolean()
+  headroomCodeAst = true;
+
+  @Fields.string()
+  headroomKompressModel = "off";
+
+  @Fields.boolean()
+  headroomCcr = true;
+
   @Fields.string()
   title = "";
 

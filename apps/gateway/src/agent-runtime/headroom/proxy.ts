@@ -50,10 +50,12 @@ async function checkHealth(): Promise<boolean> {
 
 // ─── Proxy lifecycle (auto-manage) ───────────────────────────────────
 
-const IS_WINDOWS = process.platform === "win32";
-const VENV_DIR = join(homedir(), ".pi", "headroom-venv");
-const VENV_BIN = IS_WINDOWS ? join(VENV_DIR, "Scripts") : join(VENV_DIR, "bin");
-const VENV_PYTHON = join(VENV_BIN, IS_WINDOWS ? "python.exe" : "python");
+export const IS_WINDOWS = process.platform === "win32";
+export const VENV_DIR = join(homedir(), ".pi", "headroom-venv");
+export const VENV_BIN = IS_WINDOWS
+  ? join(VENV_DIR, "Scripts")
+  : join(VENV_DIR, "bin");
+export const VENV_PYTHON = join(VENV_BIN, IS_WINDOWS ? "python.exe" : "python");
 const VENV_HEADROOM = join(VENV_BIN, IS_WINDOWS ? "headroom.exe" : "headroom");
 
 async function execAsync(

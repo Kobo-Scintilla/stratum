@@ -38,7 +38,9 @@
 			{/if}
 		</span>
 		<svg
-			class="size-3 text-muted-foreground transition-transform duration-200 {open ? 'rotate-180' : ''}"
+			class="size-3 text-muted-foreground transition-transform duration-200 {open
+				? 'rotate-180'
+				: ''}"
 			viewBox="0 0 24 24"
 			fill="none"
 			stroke="currentColor"
@@ -48,10 +50,7 @@
 		</svg>
 	</button>
 	{#if open}
-		<div
-			transition:slide={{ duration: 200 }}
-			class="border-t border-muted-foreground/20 px-3 py-2"
-		>
+		<div transition:slide={{ duration: 200 }} class="border-t border-muted-foreground/20 px-3 py-2">
 			{#if toolCall.args}
 				<div class="mb-1.5">
 					<span class="text-[10px] font-medium tracking-wider text-muted-foreground uppercase"

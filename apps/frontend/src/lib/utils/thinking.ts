@@ -1,3 +1,5 @@
+import { safeRandomUUID } from './uuid.js';
+
 export interface ParsedBlock {
 	type: 'think' | 'text';
 	text: string;
@@ -100,19 +102,19 @@ export function parseStreamSegments(segments: any[]): { activities: any[]; conte
 			for (const block of blocks) {
 				if (block.type === 'think' && isThoughtWorthDisplaying(block.text)) {
 					activities.push({
-						id: crypto.randomUUID(),
+						id: safeRandomUUID(),
 						type: 'think',
 						text: block.text
 					});
 				} else if (block.type === 'text') {
-					content = block.text;
+					content += block.text;
 				}
 			}
 		} else if (seg.type === 'tool') {
 			// If we had accumulated some content text before this tool call, it's intermediate text
 			if (content && content.trim() !== '') {
 				activities.push({
-					id: crypto.randomUUID(),
+					id: safeRandomUUID(),
 					type: 'info',
 					text: content
 				});

@@ -16,6 +16,15 @@ export class AppSettings {
   @Fields.boolean()
   defaultHeadroomEnabled = true;
 
+  @Fields.boolean()
+  defaultHeadroomCodeAst = true;
+
+  @Fields.string()
+  defaultHeadroomKompressModel = "off";
+
+  @Fields.boolean()
+  defaultHeadroomCcr = true;
+
   @Fields.string()
   defaultThinkingLevel = "medium";
 

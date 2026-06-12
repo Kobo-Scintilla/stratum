@@ -384,7 +384,8 @@ export async function runStreamLoop(
     config.modelId as never,
   );
   const model =
-    builtinModel ?? buildCustomModel(config.modelProvider, config.modelId);
+    builtinModel ??
+    (await buildCustomModel(config.modelProvider, config.modelId));
   if (!model)
     throw new Error(
       `Model ${config.modelProvider}/${config.modelId} not found`,
@@ -410,10 +411,23 @@ export async function runStreamLoop(
     }
     // Compress context via Headroom (if enabled)
     if (config.headroomEnabled) {
+      const limit =
+        config.contextWindow && config.contextWindow > 0
+          ? config.contextWindow
+          : (model as any).contextWindow;
       const compressed = await compressContext(context, {
         enabled: true,
         modelId: config.modelId,
-        contextWindow: config.contextWindow,
+        contextWindow: limit,
+        contentRouterEnabled: config.headroomCodeAst ?? true,
+        summarizationEnabled:
+          !!config.headroomKompressModel &&
+          config.headroomKompressModel !== "off",
+        summarizationModel:
+          config.headroomKompressModel === "off"
+            ? null
+            : config.headroomKompressModel || "kompress-base",
+        ccrEnabled: config.headroomCcr ?? true,
       });
       if (compressed) {
         const pct = Math.round((1 - compressed.ratio) * 100);

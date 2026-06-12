@@ -54,7 +54,7 @@
 					text: block.text
 				});
 			} else {
-				content = block.text;
+				content += block.text;
 			}
 		}
 		return { activities, content };

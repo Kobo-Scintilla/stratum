@@ -16,12 +16,16 @@ export interface QueryState<T> {
  *   let sessions = createQuery(() => AgentService.listSessions(), []);
  *   //      ^ { data: Session[], loading: boolean, error, refresh }
  */
-export function createQuery<T>(fetcher: () => Promise<T>, initial: T): QueryState<T> {
+export function createQuery<T>(
+	fetcher: () => Promise<T>,
+	initial: T,
+	options?: { lazy?: boolean }
+): QueryState<T> {
 	let data = $state<T>(initial) as T;
-	let loading = $state(false);
+	let loading = $state(browser && !options?.lazy);
 	let error = $state<string | null>(null);
 
-	if (browser) {
+	if (browser && !options?.lazy) {
 		queueMicrotask(() => refresh());
 	}
 

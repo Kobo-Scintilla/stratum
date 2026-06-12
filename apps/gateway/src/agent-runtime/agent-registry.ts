@@ -29,9 +29,7 @@ agentRegistry.register({
     "write",
     "edit",
     "bash",
-    "grep",
-    "find",
-    "ls",
+    "search",
     "ast_search",
   ],
 });

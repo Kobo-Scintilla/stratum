@@ -2,6 +2,10 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { api } from "./api.js";
+import { streamText } from "hono/streaming";
+import { spawn } from "node:child_process";
+import { VENV_PYTHON } from "./agent-runtime/headroom/proxy.js";
+import { AgentService } from "./agent-service.js";
 
 const app = new Hono();
 
@@ -16,6 +20,52 @@ app.use(
 app.route("", api);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+app.get("/api/headroom/install", (c) => {
+  const feature = c.req.query("feature");
+  if (feature !== "code" && feature !== "ml") {
+    return c.json({ error: "Invalid feature. Must be 'code' or 'ml'." }, 400);
+  }
+
+  const packageName =
+    feature === "code" ? "headroom-ai[code]" : "headroom-ai[ml]";
+
+  return streamText(c, async (stream) => {
+    await stream.writeln(`Starting installation of ${packageName}...`);
+
+    const proc = spawn(
+      VENV_PYTHON,
+      ["-m", "pip", "install", packageName, "--disable-pip-version-check"],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    proc.stdout.on("data", (chunk) => {
+      stream.write(chunk.toString());
+    });
+
+    proc.stderr.on("data", (chunk) => {
+      stream.write(chunk.toString());
+    });
+
+    const exitPromise = new Promise<number>((resolve) => {
+      proc.on("close", (code) => {
+        resolve(code ?? 0);
+      });
+    });
+
+    const exitCode = await exitPromise;
+    if (exitCode === 0) {
+      AgentService.invalidateHeadroomFeaturesCache();
+      await stream.writeln(
+        `\nInstallation of ${packageName} completed successfully!`,
+      );
+    } else {
+      await stream.writeln(`\nInstallation failed with exit code ${exitCode}`);
+    }
+  });
+});
 
 app.get("/api/info", (c) =>
   c.json({

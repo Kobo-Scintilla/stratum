@@ -14,12 +14,7 @@
 	} = $props();
 
 	const hasUsage = $derived(
-		message.role === 'assistant' &&
-			message.inputTokens != null &&
-			message.outputTokens != null &&
-			message.cacheReadTokens != null &&
-			message.cacheWriteTokens != null &&
-			message.contextMessages != null
+		message.role === 'assistant' && message.isFinal && (message.inputTokens ?? 0) > 0
 	);
 
 	const hasActivities = $derived(

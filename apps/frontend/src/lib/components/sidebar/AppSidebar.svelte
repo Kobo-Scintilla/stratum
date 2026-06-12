@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { useNavState } from '$lib/stores/nav-state.svelte.js';
+	import { useDashboardState } from '$lib/stores/dashboard-state.svelte.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { fade } from 'svelte/transition';
 	import type { ComponentProps } from 'svelte';
 	import SidebarNav from './SidebarNav.svelte';
 	import SidebarSessionList from './SidebarSessionList.svelte';
@@ -9,34 +8,57 @@
 	import SidebarSettingsPanel from './SidebarSettingsPanel.svelte';
 
 	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
-	const nav = useNavState();
+	const dashboard = useDashboardState();
 </script>
 
 <Sidebar.Root
 	bind:ref
 	collapsible="icon"
 	variant="floating"
-	class="glass-sidebar overflow-hidden *:data-[sidebar=sidebar]:flex-row"
+	class="glass-sidebar overflow-hidden *:data-[sidebar=sidebar]:flex-row max-md:hidden"
 	{...restProps}
 >
 	<SidebarNav />
 
-	<Sidebar.Root collapsible="none" class="[position:relative] hidden flex-1 md:flex">
-		{#if nav.current === 'sessions'}
-			<div in:fade={{ duration: 150 }} out:fade={{ duration: 100 }} class="absolute inset-0 p-2">
+	<Sidebar.Root collapsible="none" class="[position:relative] flex flex-1 overflow-hidden md:flex">
+		<!-- Mobile: show only active panel in-flow (no absolute positioning) -->
+		<div class="flex flex-1 flex-col overflow-hidden md:hidden">
+			{#if dashboard.activeTab === 'sessions'}
+				<SidebarSessionList />
+			{:else if dashboard.activeTab === 'providers'}
+				<SidebarProvidersList />
+			{:else if dashboard.activeTab === 'settings'}
+				<SidebarSettingsPanel />
+			{/if}
+		</div>
+
+		<!-- Desktop: absolute positioned with opacity transitions -->
+		<div class="relative hidden flex-1 md:flex">
+			<div
+				class="absolute inset-0 flex flex-col overflow-hidden p-2 transition-opacity duration-150"
+				class:opacity-100={dashboard.activeTab === 'sessions'}
+				class:opacity-0={dashboard.activeTab !== 'sessions'}
+				class:pointer-events-none={dashboard.activeTab !== 'sessions'}
+			>
 				<SidebarSessionList />
 			</div>
-		{/if}
-		{#if nav.current === 'providers'}
-			<div in:fade={{ duration: 150 }} out:fade={{ duration: 100 }} class="absolute inset-0 p-2">
+			<div
+				class="absolute inset-0 flex flex-col overflow-hidden p-2 transition-opacity duration-150"
+				class:opacity-100={dashboard.activeTab === 'providers'}
+				class:opacity-0={dashboard.activeTab !== 'providers'}
+				class:pointer-events-none={dashboard.activeTab !== 'providers'}
+			>
 				<SidebarProvidersList />
 			</div>
-		{/if}
-		{#if nav.current === 'settings'}
-			<div in:fade={{ duration: 150 }} out:fade={{ duration: 100 }} class="absolute inset-0 p-2">
+			<div
+				class="absolute inset-0 flex flex-col overflow-hidden p-2 transition-opacity duration-150"
+				class:opacity-100={dashboard.activeTab === 'settings'}
+				class:opacity-0={dashboard.activeTab !== 'settings'}
+				class:pointer-events-none={dashboard.activeTab !== 'settings'}
+			>
 				<SidebarSettingsPanel />
 			</div>
-		{/if}
+		</div>
 	</Sidebar.Root>
 </Sidebar.Root>
 

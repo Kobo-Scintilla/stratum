@@ -45,7 +45,7 @@ export const toolRegistry = new ToolRegistry();
 
 toolRegistry.register(getTimeTool);
 
-// Register OMP SDK tools (read, write, edit, bash, grep, find, ls)
+// Register OMP SDK tools (read, write, edit, bash, search)
 const piTools = getPiCodingTools(process.cwd());
 for (const tool of piTools) {
   toolRegistry.register(tool);

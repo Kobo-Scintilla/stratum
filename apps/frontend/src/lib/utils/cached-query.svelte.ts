@@ -61,8 +61,11 @@ class CachedQueryInstance<T> implements CachedQuery<T> {
 		private key: string,
 		private fetcher: () => Promise<T>,
 		private persistence: Persistence,
-		private ttl: number
-	) {}
+		private ttl: number,
+		lazy?: boolean
+	) {
+		this.loading = !lazy;
+	}
 
 	async refresh(): Promise<void> {
 		if (!this.initialized) this.initialized = true;
@@ -83,10 +86,16 @@ class CachedQueryInstance<T> implements CachedQuery<T> {
 
 const registry = new Map<string, CachedQueryInstance<unknown>>();
 
+export interface CachedQueryOptions {
+	persistence?: Persistence;
+	ttl?: number;
+	lazy?: boolean;
+}
+
 export function createCachedQuery<T>(
 	key: string,
 	fetcher: () => Promise<T>,
-	options?: { persistence?: Persistence; ttl?: number }
+	options?: CachedQueryOptions
 ): CachedQuery<T> {
 	const existing = registry.get(key);
 	if (existing) return existing as CachedQuery<T>;
@@ -94,7 +103,7 @@ export function createCachedQuery<T>(
 	const persistence = options?.persistence ?? 'none';
 	const ttl = options?.ttl ?? 0;
 	const cached = loadFromCache<T>(key, persistence);
-	const instance = new CachedQueryInstance<T>(key, fetcher, persistence, ttl);
+	const instance = new CachedQueryInstance<T>(key, fetcher, persistence, ttl, options?.lazy);
 
 	if (cached !== undefined) {
 		instance.data = cached;
@@ -102,7 +111,7 @@ export function createCachedQuery<T>(
 	}
 
 	registry.set(key, instance);
-	if (browser) queueMicrotask(() => instance.refresh());
+	if (browser && !options?.lazy) queueMicrotask(() => instance.refresh());
 	return instance;
 }
 

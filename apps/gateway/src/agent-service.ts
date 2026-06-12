@@ -14,6 +14,9 @@ import {
 } from "./agent-runtime/agent-stream.js";
 import { AppSettings } from "@opaius/shared/entities/app-settings.js";
 import { encrypt, decrypt } from "./encryption.js";
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { VENV_PYTHON } from "./agent-runtime/headroom/proxy.js";
 
 function getEncryption() {
   return { encrypt, decrypt };
@@ -82,6 +85,38 @@ export function resolveHeadroomEnabled(
   return true;
 }
 
+export function resolveHeadroomCodeAst(
+  sessionSettings?: { headroomCodeAst?: boolean } | null,
+  appSettings?: { defaultHeadroomCodeAst?: boolean } | null,
+): boolean {
+  if (sessionSettings?.headroomCodeAst != null)
+    return sessionSettings.headroomCodeAst;
+  if (appSettings?.defaultHeadroomCodeAst != null)
+    return appSettings.defaultHeadroomCodeAst;
+  return true;
+}
+
+export function resolveHeadroomKompressModel(
+  sessionSettings?: { headroomKompressModel?: string } | null,
+  appSettings?: { defaultHeadroomKompressModel?: string } | null,
+): string {
+  if (sessionSettings?.headroomKompressModel != null)
+    return sessionSettings.headroomKompressModel;
+  if (appSettings?.defaultHeadroomKompressModel != null)
+    return appSettings.defaultHeadroomKompressModel;
+  return "off";
+}
+
+export function resolveHeadroomCcr(
+  sessionSettings?: { headroomCcr?: boolean } | null,
+  appSettings?: { defaultHeadroomCcr?: boolean } | null,
+): boolean {
+  if (sessionSettings?.headroomCcr != null) return sessionSettings.headroomCcr;
+  if (appSettings?.defaultHeadroomCcr != null)
+    return appSettings.defaultHeadroomCcr;
+  return true;
+}
+
 export class AgentService {
   @BackendMethod({ allowed: true, transactional: false })
   static async ask(
@@ -110,6 +145,12 @@ export class AgentService {
       contextWindow: sessionSettings?.contextWindow ?? 0,
       thinkingLevel: sessionSettings?.thinkingLevel ?? "medium",
       headroomEnabled: resolveHeadroomEnabled(sessionSettings, appSettings),
+      headroomCodeAst: resolveHeadroomCodeAst(sessionSettings, appSettings),
+      headroomKompressModel: resolveHeadroomKompressModel(
+        sessionSettings,
+        appSettings,
+      ),
+      headroomCcr: resolveHeadroomCcr(sessionSettings, appSettings),
     };
 
     // 2. Validate provider is selected
@@ -199,6 +240,9 @@ export class AgentService {
                 contextWindow: 0,
                 thinkingLevel: config.thinkingLevel ?? "medium",
                 headroomEnabled: config.headroomEnabled ?? false,
+                headroomCodeAst: config.headroomCodeAst ?? true,
+                headroomKompressModel: config.headroomKompressModel ?? "off",
+                headroomCcr: config.headroomCcr ?? true,
                 title: summary,
               });
             } else {
@@ -390,7 +434,8 @@ export class AgentService {
   static async listSessions() {
     const sql = SqlDatabase.getDb();
     const result = await sql.execute(`
-			SELECT m.sessionId, m.content, m.createdAt, s.title, s.pinned
+			SELECT m.sessionId, m.content, m.createdAt, s.title, s.pinned,
+				(SELECT COUNT(*) FROM chatMessages m3 WHERE m3.sessionId = m.sessionId) as messageCount
 			FROM chatMessages m
 			LEFT JOIN chatSessionSettings s ON s.id = m.sessionId
 			WHERE m.sortOrder = (
@@ -404,9 +449,10 @@ export class AgentService {
     return rows.map((r) => ({
       sessionId: r.sessionId as string,
       createdAt: new Date(r.createdAt as string).toISOString(),
-      preview: String(r.content ?? "").slice(0, 120),
+      lastMessage: String(r.content ?? "").slice(0, 120),
       title: r.title ? String(r.title) : undefined,
       pinned: !!r.pinned,
+      messageCount: Number(r.messageCount ?? 0),
     }));
   }
 
@@ -431,6 +477,9 @@ export class AgentService {
         contextWindow: 0,
         thinkingLevel: "medium",
         headroomEnabled: false,
+        headroomCodeAst: true,
+        headroomKompressModel: "off",
+        headroomCcr: true,
       });
     } else {
       settings.title = title;
@@ -450,6 +499,9 @@ export class AgentService {
         contextWindow: 0,
         thinkingLevel: "medium",
         headroomEnabled: false,
+        headroomCodeAst: true,
+        headroomKompressModel: "off",
+        headroomCcr: true,
       });
       return true;
     } else {
@@ -457,5 +509,48 @@ export class AgentService {
       await remult.repo(ChatSessionSettings).save(settings);
       return settings.pinned;
     }
+  }
+
+  private static cachedFeatures: {
+    codeInstalled: boolean;
+    mlInstalled: boolean;
+  } | null = null;
+
+  static invalidateHeadroomFeaturesCache() {
+    AgentService.cachedFeatures = null;
+  }
+
+  @BackendMethod({ allowed: true, transactional: false })
+  static async checkHeadroomFeatures(): Promise<{
+    codeInstalled: boolean;
+    mlInstalled: boolean;
+  }> {
+    if (AgentService.cachedFeatures) {
+      return AgentService.cachedFeatures;
+    }
+    if (!existsSync(VENV_PYTHON)) {
+      return { codeInstalled: false, mlInstalled: false };
+    }
+    let codeInstalled = false;
+    let mlInstalled = false;
+    try {
+      execSync(
+        `"${VENV_PYTHON}" -c "import tree_sitter, tree_sitter_language_pack"`,
+        { stdio: "ignore" },
+      );
+      codeInstalled = true;
+    } catch {
+      // not installed
+    }
+    try {
+      execSync(`"${VENV_PYTHON}" -c "import torch, transformers"`, {
+        stdio: "ignore",
+      });
+      mlInstalled = true;
+    } catch {
+      // not installed
+    }
+    AgentService.cachedFeatures = { codeInstalled, mlInstalled };
+    return AgentService.cachedFeatures;
   }
 }

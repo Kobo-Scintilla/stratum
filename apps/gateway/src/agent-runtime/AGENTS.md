@@ -22,6 +22,7 @@ Manages the core pi-ai agent execution loop, tool definitions, prompt context bu
 - **Streaming**: Handle server-sent event (SSE) updates, tool call starts/ends, and token usages in `agent-stream.ts`.
 
 # Verification
+
 - Run gateway TypeScript compilation: `bunx tsc --noEmit` from the `apps/gateway` directory.
 - Run focused Headroom tests: `bun test src/agent-runtime/headroom/__tests__/headroom.test.ts` from the `apps/gateway` directory.
 

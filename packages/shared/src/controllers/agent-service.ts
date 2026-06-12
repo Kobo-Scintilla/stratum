@@ -2,7 +2,9 @@ import { BackendMethod, remult } from "remult";
 const CLIENT_ONLY_MESSAGE = "Not implemented client-side";
 
 function clientOnly(methodName: string): never {
-  throw new Error(`${methodName} is only implemented by the gateway backend (${CLIENT_ONLY_MESSAGE})`);
+  throw new Error(
+    `${methodName} is only implemented by the gateway backend (${CLIENT_ONLY_MESSAGE})`,
+  );
 }
 
 export class AgentService {
@@ -115,5 +117,13 @@ export class AgentService {
     Array<{ id: string; apiKey: string }>
   > {
     return clientOnly("getProviderApiKeys");
+  }
+
+  @BackendMethod({ allowed: true, transactional: false })
+  static async checkHeadroomFeatures(): Promise<{
+    codeInstalled: boolean;
+    mlInstalled: boolean;
+  }> {
+    return clientOnly("checkHeadroomFeatures");
   }
 }

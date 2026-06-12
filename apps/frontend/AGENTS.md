@@ -11,6 +11,7 @@ SvelteKit 5 UI providing the chat interface, session history, provider configura
 - Connection: Calls gateway API via Remult client at `http://localhost:3001/api`.
 - Theme & Styling: Soothing AI Slate & Neon Teal dark theme using Tailwind CSS v4, derived from OKLCH base colors: text oklch(0.97 0.005 260.0), background oklch(0.08 0.005 260.0), primary oklch(0.74 0.13 185.0), secondary oklch(0.60 0.12 260.0).
 - Framework Mode: Svelte 5 Runes mode only. No legacy Svelte 4 APIs.
+- Loaders: Use a consistent, clean CSS/SVG spinning circle loader for component loading states instead of pulsing skeletons.
 
 # Work Guidance
 

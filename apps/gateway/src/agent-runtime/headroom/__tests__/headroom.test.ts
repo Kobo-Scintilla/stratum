@@ -190,6 +190,27 @@ describe("piToOpenAI / openAIToPi round-trip", () => {
       expect(result[2].isError).toBe(false);
     }
   });
+
+  it("aligns messages correctly when some intermediate messages are dropped/summarized", () => {
+    const openaiMsgs = [
+      { role: "user" as const, content: "What's the weather?" },
+      {
+        role: "tool" as const,
+        content: '{"temp": 22}',
+        tool_call_id: "call_1",
+      },
+    ];
+
+    const result = openAIToPi(openaiMsgs, testMessages, systemPrompt);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].role).toBe("user");
+    expect(result[1].role).toBe("toolResult");
+    if (result[1].role === "toolResult") {
+      expect(result[1].toolCallId).toBe("call_1");
+      expect(result[1].toolName).toBe("get_weather");
+    }
+  });
 });
 
 describe("compressContext options forwarding", () => {

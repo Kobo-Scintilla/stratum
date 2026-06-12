@@ -1,20 +1,19 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { createQuery } from '$lib/stores/create-query.svelte.js';
+	import { useDashboardState } from '$lib/stores/dashboard-state.svelte.js';
 	import { remult } from 'remult';
 	import Button from '../ui/button/button.svelte';
 	import { AgentService } from '@opaius/shared/controllers/agent-service.js';
 	import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
-	import {
-		Loading02FreeIcons,
-		MessageMultiple02FreeIcons,
-		PlusSignIcon
-	} from '@hugeicons/core-free-icons';
+	import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
+	import { MessageMultiple02FreeIcons, PlusSignIcon } from '@hugeicons/core-free-icons';
 	import Icon from '../Icon.svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { getChatSession } from '$lib/stores/chat-session.svelte.js';
+	import * as ScrollArea from '$lib/components/ui/scroll-area/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
 	interface Session {
 		sessionId: string;
@@ -25,10 +24,7 @@
 		messageCount: number;
 	}
 
-	const sessions = createQuery<Session[]>(
-		() => remult.call(AgentService.listSessions, undefined) as Promise<Session[]>,
-		$page.data.sessions ?? []
-	);
+	const dashboard = useDashboardState();
 	const chat = getChatSession();
 	let liveSessionSettings = $state(new Map<string, ChatSessionSettings>());
 
@@ -48,9 +44,18 @@
 	});
 
 	$effect(() => {
-		chat.sessionId;
-		chat.isSending;
-		sessions.refresh();
+		if (dashboard.activeTab !== 'sessions') return;
+		return remult
+			.repo(ChatMessage)
+			.liveQuery({
+				limit: 1,
+				orderBy: { createdAt: 'desc' as const }
+			})
+			.subscribe({
+				next: () => {
+					dashboard.refreshSessions();
+				}
+			});
 	});
 
 	function timeAgo(iso: string, now: number): string {
@@ -84,14 +89,14 @@
 		if (!newTitle) return;
 
 		await remult.call(AgentService.renameSession, undefined, id, newTitle);
-		sessions.refresh();
+		dashboard.refreshSessions();
 	}
 
 	async function deleteSession(id: string) {
 		if (confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
 			await remult.call(AgentService.deleteSession, undefined, id);
-			sessions.refresh();
-			if ($page.params.sessionId === id) {
+			dashboard.refreshSessions();
+			if (page.params.sessionId === id) {
 				goto('/dashboard');
 			}
 		}
@@ -99,11 +104,11 @@
 
 	async function togglePin(id: string) {
 		await remult.call(AgentService.togglePinSession, undefined, id);
-		sessions.refresh();
+		dashboard.refreshSessions();
 	}
 
-	const sessionsWithTime = $derived(
-		sessions.data.map((s) => {
+	const sessionsWithTime = () =>
+		dashboard.sessions.map((s) => {
 			const live = liveSessionSettings.get(s.sessionId);
 			const createdAt = typeof s.createdAt === 'string' ? s.createdAt : s.createdAt.toISOString();
 			return {
@@ -115,184 +120,232 @@
 				messageCount: s.messageCount,
 				time: timeAgo(createdAt, Date.now())
 			};
-		})
-	);
+		});
 
-	const filteredSessions = $derived.by(() => {
+	const filteredSessions = () => {
 		const q = searchQuery.toLowerCase().trim();
-		if (!q) return sessionsWithTime;
-		return sessionsWithTime.filter(
+		if (!q) return sessionsWithTime();
+		return sessionsWithTime().filter(
 			(s) => s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q)
 		);
-	});
+	};
 </script>
 
-<Sidebar.Header class="gap-3.5 border-b px-4 py-3">
-	<div class="flex w-full items-center gap-3">
-		<div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/20">
-			<Icon icon={MessageMultiple02FreeIcons} class="size-4 text-primary" />
+<div class="flex h-full flex-col overflow-hidden">
+	<Sidebar.Header
+		class="shrink-0 gap-3.5 border-b bg-sidebar-accent/5 px-4 py-3 max-md:px-3 max-md:py-2.5"
+	>
+		<div class="flex w-full items-center gap-3">
+			<div class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/20">
+				<Icon icon={MessageMultiple02FreeIcons} class="size-4 text-primary" />
+			</div>
+			<div class="flex flex-col">
+				<span class="text-sm font-semibold text-sidebar-foreground">Chat History</span>
+				<span class="mt-0.5 text-[10px] leading-none text-sidebar-foreground/50"
+					>Manage session logs</span
+				>
+			</div>
+			<Button size="icon-xs" class="ml-auto shrink-0 rounded-lg" onclick={() => goto('/dashboard')}
+				><Icon icon={PlusSignIcon} /></Button
+			>
 		</div>
-		<span class="text-sm font-medium">Chat</span>
-		<Button size="icon-xs" class="ml-auto" onclick={() => goto('/dashboard')}
-			><Icon icon={PlusSignIcon} /></Button
-		>
-	</div>
-	<Sidebar.Input placeholder="Search sessions..." bind:value={searchQuery} />
-</Sidebar.Header>
+		<div class="relative w-full">
+			<Sidebar.Input
+				placeholder="Search sessions..."
+				bind:value={searchQuery}
+				class="w-full border-border/40 bg-sidebar-accent/10 pl-8 text-xs focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+			/>
+			<div
+				class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sidebar-foreground/40"
+			>
+				<svg
+					class="size-3.5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+				</svg>
+			</div>
+		</div>
+	</Sidebar.Header>
 
-<Sidebar.Content>
-	<Sidebar.Group class="px-0">
-		<Sidebar.GroupContent>
-			{#if sessions.loading && sessions.data.length === 0}
-				<div class="flex items-center justify-center p-4">
-					<Icon icon={Loading02FreeIcons} class="size-4 animate-spin text-primary" />
-				</div>
-			{:else}
-				{#each filteredSessions as item (item.sessionId)}
-					<div
-						class="session-item-container group relative flex w-full items-center border-b last:border-b-0 hover:brightness-110"
-						class:active-session={$page.params.sessionId === item.sessionId}
-						style="border-color: var(--sidebar-border);"
-					>
-						<!-- Main link (click to navigate) -->
-						<a
-							href="/dashboard/{item.sessionId}"
-							class="session-item min-w-0 flex-1 px-4 py-3 text-left transition-all duration-150 active:brightness-95"
-						>
-							<div class="min-w-0 flex-1 pr-6">
-								<div class="flex items-center gap-1.5">
-									<!-- Pinned status badge -->
-									{#if item.pinned}
-										<svg
-											class="size-3 shrink-0 rotate-45 text-primary"
-											viewBox="0 0 24 24"
-											fill="currentColor"
-										>
-											<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
-										</svg>
-									{/if}
-
-									{#if renamingSessionId === item.sessionId}
-										<!-- svelte-ignore a11y_autofocus -->
-										<input
-											type="text"
-											bind:value={renamingTitle}
-											onkeydown={(e) => {
-												if (e.key === 'Enter') saveRename(item.sessionId);
-												if (e.key === 'Escape') renamingSessionId = null;
-											}}
-											onblur={() => saveRename(item.sessionId)}
-											onclick={(e) => e.stopPropagation()}
-											class="w-full rounded border border-primary/45 bg-background px-1.5 py-0.5 text-xs text-foreground focus:outline-none"
-											use:focus
-										/>
-									{:else}
-										<span class="truncate text-sm font-medium">{item.title}</span>
-									{/if}
-
-									<span class="ml-auto shrink-0 text-[10px] text-sidebar-foreground/60">
-										{item.time}
-									</span>
-								</div>
-								<p class="mt-0.5 truncate text-xs text-sidebar-foreground/45">
-									{item.preview}
-								</p>
-							</div>
-						</a>
-
-						<!-- Options Button (visible on hover) -->
-						<div
-							class="absolute top-1/2 right-2 z-10 -translate-y-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100"
-						>
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger
-									class="flex size-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted-foreground/10 hover:text-foreground focus-visible:outline-none"
+	<Sidebar.Content class="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+		<ScrollArea.Root class="h-full w-full flex-1">
+			<div class="space-y-0.5 py-2 max-md:py-1">
+				<Skeleton
+					name="sessions-list"
+					loading={dashboard.sessionsLoading && dashboard.sessions.length === 0}
+				>
+					{#snippet fallback()}
+						<div class="animate-pulse space-y-3 p-3">
+							{#each Array(6) as _, i}
+								<div
+									class="flex items-center gap-3 border-b border-border/5 py-2.5 last:border-b-0"
 								>
-									<svg
-										class="size-4"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<circle cx="12" cy="12" r="1" />
-										<circle cx="19" cy="12" r="1" />
-										<circle cx="5" cy="12" r="1" />
-									</svg>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content align="end" class="w-36 p-1">
-									<!-- Pin / Unpin option -->
-									<DropdownMenu.Item
-										onclick={() => togglePin(item.sessionId)}
-										class="flex cursor-pointer items-center gap-2 text-xs"
-									>
-										<svg
-											class="size-3.5 {item.pinned ? 'fill-primary text-primary' : ''}"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-										>
-											<path d="M12 2v8M5 10h14M19 10l-2 8H7l-2-8M12 18v4" />
-										</svg>
-										<span>{item.pinned ? 'Unpin' : 'Pin'}</span>
-									</DropdownMenu.Item>
-
-									<!-- Rename option -->
-									<DropdownMenu.Item
-										onclick={() => startRename(item.sessionId, item.title)}
-										class="flex cursor-pointer items-center gap-2 text-xs"
-									>
-										<svg
-											class="size-3.5"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-										>
-											<path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-										</svg>
-										<span>Rename</span>
-									</DropdownMenu.Item>
-
-									<DropdownMenu.Separator />
-
-									<!-- Delete option -->
-									<DropdownMenu.Item
-										onclick={() => deleteSession(item.sessionId)}
-										class="flex cursor-pointer items-center gap-2 text-xs text-destructive focus:bg-destructive/10 focus:text-destructive"
-									>
-										<svg
-											class="size-3.5"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
-										>
-											<path
-												d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"
-											/>
-										</svg>
-										<span>Delete</span>
-									</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
+									<div class="size-8 shrink-0 rounded-lg bg-sidebar-foreground/10"></div>
+									<div class="min-w-0 flex-1 space-y-2">
+										<div class="h-3 w-2/3 rounded bg-sidebar-foreground/15"></div>
+										<div class="h-2 w-1/2 rounded bg-sidebar-foreground/10"></div>
+									</div>
+								</div>
+							{/each}
 						</div>
-					</div>
-				{/each}
-			{/if}
-		</Sidebar.GroupContent>
-	</Sidebar.Group>
-</Sidebar.Content>
+					{/snippet}
+
+					{#each filteredSessions() as item (item.sessionId)}
+						<div
+							class="session-item-container group relative flex w-full items-center border-l-2 border-transparent transition-all duration-200 max-md:border-l-[3px]"
+							class:active-session={page.params.sessionId === item.sessionId}
+						>
+							<a
+								href="/dashboard/{item.sessionId}"
+								class="session-item min-w-0 flex-1 px-4 py-3 text-left transition-all duration-150 max-md:px-3 max-md:py-2"
+							>
+								<div class="min-w-0 flex-1 pr-6">
+									<div class="flex items-center gap-1.5">
+										{#if item.pinned}
+											<svg
+												class="size-3 shrink-0 rotate-45 text-primary"
+												viewBox="0 0 24 24"
+												fill="currentColor"
+											>
+												<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+											</svg>
+										{/if}
+
+										{#if renamingSessionId === item.sessionId}
+											<input
+												type="text"
+												bind:value={renamingTitle}
+												onkeydown={(e) => {
+													if (e.key === 'Enter') saveRename(item.sessionId);
+													if (e.key === 'Escape') renamingSessionId = null;
+												}}
+												onblur={() => saveRename(item.sessionId)}
+												onclick={(e) => e.stopPropagation()}
+												class="w-full rounded border border-primary/45 bg-background px-1.5 py-0.5 text-xs text-foreground focus:ring-1 focus:ring-primary/40 focus:outline-none"
+												use:focus
+											/>
+										{:else}
+											<span
+												class="truncate text-xs leading-normal font-semibold text-sidebar-foreground/85 transition-colors group-hover:text-sidebar-foreground"
+												class:text-primary={page.params.sessionId === item.sessionId}
+												>{item.title}</span
+											>
+										{/if}
+
+										<span class="ml-auto shrink-0 text-[9px] text-sidebar-foreground/45">
+											{item.time}
+										</span>
+									</div>
+									<p
+										class="mt-0.5 truncate text-[10px] text-sidebar-foreground/45 transition-colors group-hover:text-sidebar-foreground/60"
+									>
+										{item.preview || 'No messages yet'}
+									</p>
+								</div>
+							</a>
+
+							<div
+								class="absolute top-1/2 right-3 z-10 -translate-y-1/2 opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-within:opacity-100"
+							>
+								<DropdownMenu.Root>
+									<DropdownMenu.Trigger
+										class="flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-foreground focus-visible:outline-none"
+									>
+										<svg
+											class="size-3.5"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<circle cx="12" cy="12" r="1" />
+											<circle cx="19" cy="12" r="1" />
+											<circle cx="5" cy="12" r="1" />
+										</svg>
+									</DropdownMenu.Trigger>
+									<DropdownMenu.Content
+										align="end"
+										class="w-36 border-border/40 p-1 shadow-lg"
+										onOpenAutoFocus={(e) => e.preventDefault()}
+										onCloseAutoFocus={(e) => e.preventDefault()}
+									>
+										<DropdownMenu.Item
+											onclick={() => togglePin(item.sessionId)}
+											class="flex cursor-pointer items-center gap-2 text-xs"
+										>
+											<svg
+												class="size-3.5 {item.pinned ? 'fill-primary text-primary' : ''}"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path d="M12 2v8M5 10h14M19 10l-2 8H7l-2-8M12 18v4" />
+											</svg>
+											<span>{item.pinned ? 'Unpin' : 'Pin'}</span>
+										</DropdownMenu.Item>
+
+										<DropdownMenu.Item
+											onclick={() => startRename(item.sessionId, item.title)}
+											class="flex cursor-pointer items-center gap-2 text-xs"
+										>
+											<svg
+												class="size-3.5"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+											</svg>
+											<span>Rename</span>
+										</DropdownMenu.Item>
+
+										<DropdownMenu.Separator />
+
+										<DropdownMenu.Item
+											onclick={() => deleteSession(item.sessionId)}
+											class="flex cursor-pointer items-center gap-2 text-xs text-destructive focus:bg-destructive/10 focus:text-destructive"
+										>
+											<svg
+												class="size-3.5"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+											>
+												<path
+													d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"
+												/>
+											</svg>
+											<span>Delete</span>
+										</DropdownMenu.Item>
+									</DropdownMenu.Content>
+								</DropdownMenu.Root>
+							</div>
+						</div>
+					{/each}
+				</Skeleton>
+			</div>
+		</ScrollArea.Root>
+	</Sidebar.Content>
+</div>
 
 <style>
 	.session-item-container {
 		background: transparent;
 	}
 	.session-item-container:hover,
-	.session-item-container:focus-within,
+	.session-item-container:focus-within {
+		background: var(--sidebar-accent) !important;
+	}
 	.active-session {
 		background: var(--sidebar-accent) !important;
+		border-left-color: hsl(var(--primary)) !important;
 	}
 	.session-item {
 		background: transparent;
