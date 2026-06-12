@@ -7,8 +7,9 @@
 	import { useDashboardState } from '$lib/stores/dashboard-state.svelte.js';
 	import { remult } from 'remult';
 	import { safeRandomUUID } from '$lib/utils/uuid.js';
-	import { AppSettings } from '@opaius/shared/entities/app-settings.js';
-	import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
+	import { AppSettings } from '@stratum/shared/entities/app-settings.js';
+	import { ChatSessionSettings } from '@stratum/shared/entities/chat-session-settings.js';
+	import { createLiveQuery } from '$lib/stores/live-query.svelte.js';
 	import ChatInputBar from '$lib/components/chat/ChatInputBar.svelte';
 	import ChatMessageList from '$lib/components/chat/ChatMessageList.svelte';
 	import ToolCall from '$lib/components/chat/ToolCall.svelte';
@@ -123,38 +124,50 @@
 		}
 	});
 
+	// svelte-ignore state_referenced_locally
+	const sessionSettingsQuery = createLiveQuery<ChatSessionSettings, ChatSessionSettings | null>(
+		() =>
+			sessionId
+				? { repo: remult.repo(ChatSessionSettings), options: { where: { id: sessionId } } }
+				: null,
+		{
+			initial: data.settings ?? pageData.settings ?? null,
+			reducer: (info) => info.items[0] ?? null
+		}
+	);
+
 	$effect(() => {
-		if (!sessionId) return;
-		return remult
-			.repo(ChatSessionSettings)
-			.liveQuery({ where: { id: sessionId } })
-			.subscribe({
-				next: (info) => {
-					sessionSettings = info.items[0] ?? null;
-				},
-				error: (err) => {
-					toast.error(err instanceof Error ? err.message : String(err), {
-						description: 'Session settings live sync failed.',
-						duration: 8000
-					});
-				}
-			});
+		sessionSettings = sessionSettingsQuery.data;
 	});
+
 	$effect(() => {
-		return remult
-			.repo(AppSettings)
-			.liveQuery({ where: { id: '_defaults' } })
-			.subscribe({
-				next: (info) => {
-					dashboard.defaults = info.items[0] ?? null;
-				},
-				error: (err) => {
-					toast.error(err instanceof Error ? err.message : String(err), {
-						description: 'Default settings live sync failed.',
-						duration: 8000
-					});
-				}
+		if (sessionSettingsQuery.error) {
+			toast.error(sessionSettingsQuery.error, {
+				description: 'Session settings live sync failed.',
+				duration: 8000
 			});
+		}
+	});
+
+	const appDefaultsQuery = createLiveQuery<AppSettings, AppSettings | null>(
+		() => ({ repo: remult.repo(AppSettings), options: { where: { id: '_defaults' } } }),
+		{
+			initial: dashboard.defaults,
+			reducer: (info) => info.items[0] ?? null
+		}
+	);
+
+	$effect(() => {
+		dashboard.defaults = appDefaultsQuery.data;
+	});
+
+	$effect(() => {
+		if (appDefaultsQuery.error) {
+			toast.error(appDefaultsQuery.error, {
+				description: 'Default settings live sync failed.',
+				duration: 8000
+			});
+		}
 	});
 	async function handleSend(text: string) {
 		const wasNull = !chat.sessionId;

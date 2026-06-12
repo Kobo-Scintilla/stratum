@@ -11,7 +11,10 @@ Hono + Remult backend providing the REST endpoints, live query database sync, an
 - Port: Runs on port `3001`.
 - Database: Interacts with `db.sqlite` at the repo root using `remult/remult-bun-sqlite`.
 - API Security: Key management is encrypted via AES-256-GCM server-side (`encryption.ts`).
+- Workspace: Agent tools (read, write, edit, search, bash) are restricted/scoped to `~/.stratum/workspace`.
+- Headroom: Auto-managed proxy resides in `~/.stratum/headroom-venv`.
 - CORS: Restricts origin to `http://localhost:5173`.
+
 
 # Work Guidance
 

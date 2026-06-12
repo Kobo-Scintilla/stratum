@@ -1,6 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import { remult } from 'remult';
-import { AgentService } from '@opaius/shared/controllers/agent-service.js';
+import { AgentService } from '@stratum/shared/controllers/agent-service.js';
 import { browser } from '$app/environment';
 import { persistedState } from 'svelte-persisted-state';
 import { Folder01Icon, Settings02FreeIcons, ApiIcon } from '@hugeicons/core-free-icons';

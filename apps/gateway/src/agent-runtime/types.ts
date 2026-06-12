@@ -6,4 +6,4 @@ export type {
   ToolDefinition,
   ToolResult,
   TrackedToolCall,
-} from "@opaius/shared/types.js";
+} from "@stratum/shared/types.js";

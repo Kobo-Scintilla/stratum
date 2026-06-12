@@ -1,5 +1,5 @@
 {
-	"name": "@opaius/app",
+	"name": "@stratum/app",
 	"version": "0.0.1",
 	"private": true,
 	"type": "module",
@@ -10,13 +10,12 @@
 		"check": "NODE_OPTIONS='--no-deprecation' svelte-kit sync && NODE_OPTIONS='--no-deprecation' svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "NODE_OPTIONS='--no-deprecation' svelte-kit sync && NODE_OPTIONS='--no-deprecation' svelte-check --tsconfig ./tsconfig.json --watch",
 		"prepare": "NODE_OPTIONS='--no-deprecation' svelte-kit sync",
-		"lint": "prettier --check .",
-		"format": "prettier --write ."
+		"lint": "prettier --check ."
 	},
 	"dependencies": {
 		"@hugeicons/core-free-icons": "^4.2.0",
 		"@hugeicons/svelte": "^1.1.2",
-		"@opaius/shared": "workspace:*",
+		"@stratum/shared": "workspace:*",
 		"formsnap": "^2.0.1",
 		"marked": "^18.0.5",
 		"prismjs": "^1.30.0",

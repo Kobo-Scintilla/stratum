@@ -5,131 +5,19 @@ import type {
   Message,
   Usage,
 } from "@earendil-works/pi-ai";
-import { ActiveStream } from "@opaius/shared/entities/active-stream.js";
-import { ChatMessage } from "@opaius/shared/entities/chat-message.js";
-import { ProviderSetting } from "@opaius/shared/entities/provider-setting.js";
+import { ActiveStream } from "@stratum/shared/entities/active-stream.js";
+import { ChatMessage } from "@stratum/shared/entities/chat-message.js";
 import type { Context, AgentConfig, TrackedToolCall } from "./types.js";
 import { toolRegistry } from "./agent-tools.js";
 import { compressContext } from "./headroom/index.js";
 import { persistToolResult } from "./agent-context.js";
+import {
+  buildCustomModel,
+  updateActiveStream,
+  insertAssistantMessage,
+} from "./agent-stream-helpers.js";
 
-interface CustomModel {
-  id: string;
-  name: string;
-  api: string;
-  provider: string;
-  baseUrl: string;
-  reasoning: boolean;
-  input: string[];
-  cost: {
-    input: number;
-    output: number;
-    cacheRead: number;
-    cacheWrite: number;
-  };
-  contextWindow: number;
-  maxTokens: number;
-}
 
-async function buildCustomModel(
-  providerId: string,
-  modelId: string,
-): Promise<CustomModel | undefined> {
-  const settings = await remult.repo(ProviderSetting).findId(providerId);
-  if (!settings?.baseUrl) return undefined;
-
-  const apiType = settings.apiType ?? "openai-completions";
-  return {
-    id: modelId,
-    name: modelId,
-    api: apiType,
-    provider: providerId,
-    baseUrl: settings.baseUrl,
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 4096,
-    maxTokens: 4096,
-  };
-}
-
-async function updateActiveStream(
-  stream: ActiveStream,
-  text: string,
-  toolCalls: ActiveStream["toolCalls"],
-  segments: ActiveStream["segments"],
-): Promise<void> {
-  await remult.repo(ActiveStream).update(stream.id, {
-    text,
-    toolCalls: toolCalls.map((t) => ({ ...t })),
-    segments,
-  });
-}
-
-async function insertAssistantMessage(
-  sessionId: string,
-  text: string,
-  toolCalls: TrackedToolCall[],
-  sortOrder: number,
-  inputTokens = 0,
-  outputTokens = 0,
-  cacheReadTokens = 0,
-  cacheWriteTokens = 0,
-  contextMessages = 0,
-  usageCost = 0,
-  headroomTokensSaved = 0,
-  headroomRatio = 1,
-): Promise<void> {
-  await remult.repo(ChatMessage).insert({
-    id: crypto.randomUUID(),
-    sessionId,
-    role: "assistant",
-    content: text,
-    toolCalls:
-      toolCalls.length > 0
-        ? toolCalls.map((t) => ({ id: t.id, name: t.name, args: t.args }))
-        : undefined,
-    sortOrder,
-    createdAt: new Date(sortOrder),
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheWriteTokens,
-    contextMessages,
-    usageCost,
-    headroomTokensSaved,
-    headroomRatio,
-  });
-}
-
-export async function insertActiveStream(
-  sessionId: string,
-  prompt: string,
-): Promise<ActiveStream> {
-  return await remult.repo(ActiveStream).insert({
-    id: crypto.randomUUID(),
-    sessionId,
-    prompt,
-    text: "",
-    isGenerating: true,
-    createdAt: new Date(),
-    toolCalls: [],
-  });
-}
-
-export async function insertUserMessage(
-  sessionId: string,
-  content: string,
-): Promise<void> {
-  await remult.repo(ChatMessage).insert({
-    id: crypto.randomUUID(),
-    sessionId,
-    role: "user",
-    content,
-    sortOrder: Date.now(),
-    createdAt: new Date(),
-  });
-}
 
 interface StreamState {
   accumulatedText: string;
@@ -378,6 +266,26 @@ export async function runStreamLoop(
   sessionId: string,
   streamId: string,
 ): Promise<void> {
+  // Finalize any previous checkpoints in this session
+  try {
+    const { completeCheckpoint } = await import("./git-checkpoint.js");
+    const pendingMsgs = await remult.repo(ChatMessage).find({
+      where: {
+        sessionId,
+        checkpointHash: { $ne: undefined }
+      }
+    });
+    for (const msg of pendingMsgs) {
+      if (msg.checkpointHash) {
+        completeCheckpoint(msg.checkpointHash);
+        msg.checkpointHash = undefined;
+        await remult.repo(ChatMessage).save(msg);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to finalize previous checkpoints:", err);
+  }
+
   // Try built-in model registry first, fall back to custom model
   const builtinModel = getModel(
     config.modelProvider as never,
@@ -484,8 +392,9 @@ export async function runStreamLoop(
     }
 
     // ── Save assistant message to DB for history ──
+    let savedMsg: ChatMessage | null = null;
     if (state.accumulatedText || state.toolCalls.length > 0) {
-      await insertAssistantMessage(
+      savedMsg = await insertAssistantMessage(
         sessionId,
         state.accumulatedText,
         state.toolCalls,
@@ -505,6 +414,20 @@ export async function runStreamLoop(
     }
 
     if (state.toolCalls.length === 0) break;
+
+    // Create a Git checkpoint before executing tools
+    try {
+      const { createCheckpoint } = await import("./git-checkpoint.js");
+      const checkpointHash = createCheckpoint();
+      
+      // Update assistant message with checkpointHash
+      if (savedMsg && checkpointHash) {
+        savedMsg.checkpointHash = checkpointHash;
+        await remult.repo(ChatMessage).save(savedMsg);
+      }
+    } catch (err) {
+      console.error("Failed to create checkpoint before tool run:", err);
+    }
 
     // Execute tools and add results to context for next iteration
     for (const tc of state.toolCalls) {
@@ -564,36 +487,4 @@ export async function runStreamLoop(
   await remult.repo(ActiveStream).save(stream);
 }
 
-export async function generateTitleSummary(
-  provider: string,
-  modelId: string,
-  userPrompt: string,
-): Promise<string> {
-  const builtinModel = getModel(provider as never, modelId as never);
-  const model = builtinModel ?? (await buildCustomModel(provider, modelId));
-  if (!model) {
-    throw new Error(`Summary model not found: ${provider}/${modelId}`);
-  }
 
-  const context = {
-    systemPrompt:
-      'You are a session title summarizer. Summarize the user\'s initial prompt into a clean, concise, title-cased session title of 2 to 5 words. Do not use quotes, markdown formatting, or prefixing like "Title:". Respond ONLY with the title itself.',
-    messages: [
-      {
-        role: "user" as const,
-        content: [{ type: "text" as const, text: userPrompt }],
-        timestamp: Date.now(),
-      },
-    ],
-    tools: [],
-  };
-
-  const eventStream = streamSimple(model, context, {});
-  let title = "";
-  for await (const event of eventStream) {
-    if (event.type === "text_delta") {
-      title += event.delta;
-    }
-  }
-  return title.trim().replace(/^["']|["']$/g, ""); // strip any quotes
-}

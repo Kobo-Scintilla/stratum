@@ -1,18 +1,20 @@
 import { BackendMethod, remult, SqlDatabase } from "remult";
-import { ActiveStream } from "@opaius/shared/entities/active-stream.js";
-import { ChatMessage } from "@opaius/shared/entities/chat-message.js";
-import { ProviderSetting } from "@opaius/shared/entities/provider-setting.js";
-import { ChatSessionSettings } from "@opaius/shared/entities/chat-session-settings.js";
+import { ActiveStream } from "@stratum/shared/entities/active-stream.js";
+import { ChatMessage } from "@stratum/shared/entities/chat-message.js";
+import { ProviderSetting } from "@stratum/shared/entities/provider-setting.js";
+import { ChatSessionSettings } from "@stratum/shared/entities/chat-session-settings.js";
 import { getProviders, getModels, findEnvKeys } from "@earendil-works/pi-ai";
 import { agentRegistry } from "./agent-runtime/agent-registry.js";
 import { buildContext } from "./agent-runtime/agent-context.js";
 import {
   runStreamLoop,
+} from "./agent-runtime/agent-stream.js";
+import {
   insertActiveStream,
   insertUserMessage,
   generateTitleSummary,
-} from "./agent-runtime/agent-stream.js";
-import { AppSettings } from "@opaius/shared/entities/app-settings.js";
+} from "./agent-runtime/agent-stream-helpers.js";
+import { AppSettings } from "@stratum/shared/entities/app-settings.js";
 import { encrypt, decrypt } from "./encryption.js";
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -314,24 +316,6 @@ export class AgentService {
     return [...builtins, ...customProviders];
   }
 
-  @BackendMethod({ allowed: true, transactional: false })
-  static async getProviderApiKeys(): Promise<Record<string, string>> {
-    const settings = await remult.repo(ProviderSetting).find();
-    const enc = getEncryption();
-    const keys: Record<string, string> = {};
-    for (const s of settings) {
-      if (s.apiKey) {
-        try {
-          keys[s.id] = enc.decrypt(s.apiKey);
-        } catch {
-          // If decryption fails, return as-is (migration fallback)
-          keys[s.id] = s.apiKey;
-        }
-      }
-    }
-    return keys;
-  }
-
   @BackendMethod({ allowed: true })
   static async saveProviderKey(
     providerId: string,
@@ -552,5 +536,33 @@ export class AgentService {
     }
     AgentService.cachedFeatures = { codeInstalled, mlInstalled };
     return AgentService.cachedFeatures;
+  }
+
+  @BackendMethod({ allowed: true, transactional: true })
+  static async rollbackSessionToMessage(messageId: string): Promise<boolean> {
+    const msg = await remult.repo(ChatMessage).findId(messageId);
+    if (!msg || !msg.checkpointHash) {
+      throw new Error("Message not found or has no rollback checkpoint");
+    }
+
+    try {
+      const { rollbackToCheckpoint } = await import("./agent-runtime/git-checkpoint.js");
+      rollbackToCheckpoint(msg.checkpointHash);
+
+      // Delete the assistant message and subsequent messages in this session
+      const sessionMsgs = await remult.repo(ChatMessage).find({
+        where: {
+          sessionId: msg.sessionId,
+          sortOrder: { $gte: msg.sortOrder }
+        }
+      });
+      for (const m of sessionMsgs) {
+        await remult.repo(ChatMessage).delete(m.id);
+      }
+      return true;
+    } catch (err) {
+      console.error("Rollback failed:", err);
+      return false;
+    }
   }
 }

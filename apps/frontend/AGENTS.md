@@ -19,9 +19,10 @@ SvelteKit 5 UI providing the chat interface, session history, provider configura
 - **Page Shape**: Keep route pages thin. Extract large page sections into focused components under `src/lib/components/`; pages should orchestrate loading, live sync, navigation, and callbacks.
 - **Runes**: Always use `$state`, `$derived`, `$effect`, and `$props` for state management and props.
 - **Stores**: Use Svelte 5 runes-based files under `src/lib/stores/` for client-side state.
-- **Remult live sync**: Use Remult `liveQuery` for realtime entity lists such as chat messages, active streams, and session settings; return the unsubscribe function from `$effect` cleanup.
+- **Remult live sync**: Use the universal `createLiveQuery` rune for real-time entity synchronization. Avoid writing manual `$effect(() => { return repo.liveQuery().subscribe(...) })` boilerplate inside pages/components.
 - **Clean Code**: Prefer readable, maintainable code over dense one-file logic or clever type gymnastics. Avoid unnecessary `any`, oversized props, and duplicated UI blocks.
-- **Path Aliases**: Use `$lib` for `src/lib/` and `@opaius/shared` for the shared library package.
+- **Framework Abstraction**: If a pattern requires repeating manual subscriptions, lifecycle effects, or state-handling boilerplate (e.g., localStorage caching, Remult liveQuery subscriptions), extract them into a Svelte 5 custom rune/hook rather than copy-pasting across files.
+- **Path Aliases**: Use `$lib` for `src/lib/` and `@stratum/shared` for the shared library package.
 - **Icons & Typography**: Use Remixicon Svelte + Hugeicons, and Outfit Variable font.
 - **Utility**: Use the `cn()` function from `$lib/utils.ts` for styling classes combining.
 

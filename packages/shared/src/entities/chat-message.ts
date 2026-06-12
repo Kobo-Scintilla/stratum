@@ -68,4 +68,8 @@ export class ChatMessage {
 
   @Fields.number()
   headroomRatio = 1;
+
+  @Fields.string()
+  checkpointHash?: string = undefined;
 }
+

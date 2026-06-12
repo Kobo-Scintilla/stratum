@@ -7,7 +7,9 @@
 
 	let { children, data } = $props();
 
+	// svelte-ignore state_referenced_locally
 	if (data.headroomFeatures) {
+		// svelte-ignore state_referenced_locally
 		headroomInstallStore.initialize(data.headroomFeatures);
 	}
 

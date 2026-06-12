@@ -1,6 +1,6 @@
 import { remult } from 'remult';
-import { AgentService } from '@opaius/shared/controllers/agent-service.js';
-import { AppSettings } from '@opaius/shared/entities/app-settings.js';
+import { AgentService } from '@stratum/shared/controllers/agent-service.js';
+import { AppSettings } from '@stratum/shared/entities/app-settings.js';
 
 export async function load({ fetch, cookies }) {
 	remult.apiClient.httpClient = fetch;

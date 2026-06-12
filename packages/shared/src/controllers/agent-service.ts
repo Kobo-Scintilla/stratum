@@ -113,17 +113,15 @@ export class AgentService {
   }
 
   @BackendMethod({ allowed: true, transactional: false })
-  static async getProviderApiKeys(): Promise<
-    Array<{ id: string; apiKey: string }>
-  > {
-    return clientOnly("getProviderApiKeys");
-  }
-
-  @BackendMethod({ allowed: true, transactional: false })
   static async checkHeadroomFeatures(): Promise<{
     codeInstalled: boolean;
     mlInstalled: boolean;
   }> {
     return clientOnly("checkHeadroomFeatures");
+  }
+
+  @BackendMethod({ allowed: true, transactional: true })
+  static async rollbackSessionToMessage(messageId: string): Promise<boolean> {
+    return clientOnly("rollbackSessionToMessage");
   }
 }

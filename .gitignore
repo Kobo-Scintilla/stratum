@@ -25,3 +25,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local agent run data
+.agents/

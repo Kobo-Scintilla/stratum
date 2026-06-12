@@ -9,7 +9,7 @@ const config = {
 	kit: {
 		adapter: adapter(),
 		alias: {
-			'@opaius/shared': '../../packages/shared/src'
+			'@stratum/shared': '../../packages/shared/src'
 		}
 	}
 };

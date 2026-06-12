@@ -1,6 +1,6 @@
 import { remult } from 'remult';
-import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
-import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
+import { ChatMessage } from '@stratum/shared/entities/chat-message.js';
+import { ChatSessionSettings } from '@stratum/shared/entities/chat-session-settings.js';
 
 export async function load({ params, fetch }) {
 	remult.apiClient.httpClient = fetch;

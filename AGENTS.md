@@ -83,11 +83,14 @@ When the user requests a durable behavior change, record it here or in the relev
 
 ## Project Overview & Architecture
 
-This is a Turborepo monorepo using Bun workspaces:
+This is the **Stratum** monorepo, a Turborepo using Bun workspaces:
 
 - **`apps/frontend/`** — SvelteKit 5 UI (SSR + dashboard + chat)
 - **`apps/gateway/`** — Hono + Remult + pi-ai backend (agent loop, SQLite, tools)
 - **`packages/shared/`** — Remult entities + shared types
+
+### Agent Workspace
+The agent executes commands and operates within the workspace directory at `~/.stratum/workspace`. All file-related tools (read, write, edit, search, bash) are scoped to this directory.
 
 ### Architecture & Data Flow
 
@@ -101,7 +104,7 @@ Gateway (Hono + Remult + pi-ai)
   ├── api.ts       ── Remult API (bun:sqlite, entities, controllers)
   ├── encryption   ── AES-256-GCM key encrypt/decrypt
   ├── agent-service.ts  ── @BackendMethod controller: ask(), recoverMessages()
-  └─ agent-runtime/     ── pi-ai loop, context building, tool execution
+  └─ agent-runtime/     ── pi-ai loop, context building, tool execution (cwd: ~/.stratum/workspace)
        └── tools/        ── Agent tool definitions (get-time, etc.)
 
 
@@ -125,6 +128,15 @@ SQLite (db.sqlite at repo root)
 | File naming     | `kebab-case` for files, `PascalCase` for classes/components, `camelCase` for functions/vars |
 | Package Manager | Bun (`bun run dev`, `bun run build`, etc.)                                                  |
 | TypeScript      | v6, strict mode, ESM modules, `experimentalDecorators: true`                                |
+
+### Code File Size & Splitting Guidelines
+
+To prevent excessive file sizes and reduce cognitive load, follow these rules:
+
+- **Keep Large Files If Unified**: State machines, complex core orchestrators, or tightly-coupled algorithms (e.g. [agent-stream.ts](file:///home/cioky/Projects/app/apps/gateway/src/agent-runtime/agent-stream.ts)) should stay unified. Splitting increases navigation overhead and introduces tight coupling.
+- **Split Multi-Responsibility Files**: If a file does more than one distinct task, extract sub-modules or custom hooks.
+- **Svelte Component Split**: Svelte files exceeding 500 lines (e.g. [SidebarSettingsPanel.svelte](file:///home/cioky/Projects/app/apps/frontend/src/lib/components/sidebar/SidebarSettingsPanel.svelte)) must have sub-panels (like API key manager or advanced features cards) extracted into focused sub-components.
+- **Extract Non-UI Logic**: Move complex data processing, validation, or fetching out of `.svelte` `<script>` tags and place them in pure `.ts` utility files.
 
 ---
 

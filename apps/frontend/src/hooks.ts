@@ -1,8 +1,8 @@
 import { repo, type ClassType } from 'remult';
-import { ActiveStream } from '@opaius/shared/entities/active-stream.js';
-import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
-import { ProviderSetting } from '@opaius/shared/entities/provider-setting.js';
-import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
+import { ActiveStream } from '@stratum/shared/entities/active-stream.js';
+import { ChatMessage } from '@stratum/shared/entities/chat-message.js';
+import { ProviderSetting } from '@stratum/shared/entities/provider-setting.js';
+import { ChatSessionSettings } from '@stratum/shared/entities/chat-session-settings.js';
 import type { Transport } from '@sveltejs/kit';
 
 const ENTITIES = [ActiveStream, ChatMessage, ProviderSetting, ChatSessionSettings] as const;

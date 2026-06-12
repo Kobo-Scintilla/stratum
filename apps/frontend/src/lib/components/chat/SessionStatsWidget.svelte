@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ChatMessage } from '@opaius/shared/entities/chat-message.js';
-	import type { ActiveStream } from '@opaius/shared/entities/active-stream.js';
+	import type { ChatMessage } from '@stratum/shared/entities/chat-message.js';
+	import type { ActiveStream } from '@stratum/shared/entities/active-stream.js';
 	import { onMount } from 'svelte';
 	import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
 	import Icon from '$lib/components/Icon.svelte';

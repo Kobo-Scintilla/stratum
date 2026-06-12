@@ -6,6 +6,8 @@
 	import Markdown from '$lib/components/Markdown.svelte';
 	import type { EnrichedMessage } from '$lib/stores/chat-session.svelte.js';
 	import AgentActivity from './AgentActivity.svelte';
+	import { AgentService } from '@stratum/shared/controllers/agent-service.js';
+	import { toast } from 'svelte-sonner';
 
 	let {
 		message
@@ -20,6 +22,23 @@
 	const hasActivities = $derived(
 		message.role === 'assistant' && message.activities && message.activities.length > 0
 	);
+
+	async function handleRollback() {
+		try {
+			const ok = await AgentService.rollbackSessionToMessage(message.id);
+			if (ok) {
+				toast.success('Workspace rolled back to pre-tool execution checkpoint.');
+				if (browser) {
+					window.location.reload();
+				}
+			} else {
+				toast.error('Rollback failed.');
+			}
+		} catch (err) {
+			console.error(err);
+			toast.error('Failed to trigger rollback.');
+		}
+	}
 </script>
 
 <div class="flex gap-3 {message.role === 'user' ? 'flex-row-reverse' : ''}">
@@ -58,19 +77,32 @@
 			{/if}
 		</div>
 
-		{#if hasUsage}
+		{#if hasUsage || message.checkpointHash}
 			<div
 				class="mt-1 flex items-center gap-1.5 px-1 font-mono text-[10px] tracking-tight text-muted-foreground/40 select-none"
 			>
-				<span>in: {message.inputTokens?.toLocaleString()}</span>
-				<span>•</span>
-				<span>out: {message.outputTokens?.toLocaleString()}</span>
-				{#if (message.cacheReadTokens || 0) > 0 || (message.cacheWriteTokens || 0) > 0}
+				{#if hasUsage}
+					<span>in: {message.inputTokens?.toLocaleString()}</span>
 					<span>•</span>
-					<span
-						>cache: {message.cacheReadTokens?.toLocaleString()} read / {message.cacheWriteTokens?.toLocaleString()}
-						write</span
+					<span>out: {message.outputTokens?.toLocaleString()}</span>
+					{#if (message.cacheReadTokens || 0) > 0 || (message.cacheWriteTokens || 0) > 0}
+						<span>•</span>
+						<span
+							>cache: {message.cacheReadTokens?.toLocaleString()} read / {message.cacheWriteTokens?.toLocaleString()}
+							write</span
+						>
+					{/if}
+				{/if}
+				{#if hasUsage && message.checkpointHash}
+					<span>•</span>
+				{/if}
+				{#if message.checkpointHash}
+					<button
+						onclick={handleRollback}
+						class="text-red-500 hover:text-red-400 hover:underline cursor-pointer transition-colors duration-150"
 					>
+						[Rollback Changes]
+					</button>
 				{/if}
 			</div>
 		{/if}

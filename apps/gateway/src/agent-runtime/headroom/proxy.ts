@@ -7,7 +7,7 @@
  * Two modes:
  *  - **Manual**: `HEADROOM_URL` env var set → user manages the proxy themselves.
  *  - **Auto-managed**: No env var → installs & spawns headroom proxy in
- *    `~/.pi/headroom-venv`.
+ *    `~/.stratum/headroom-venv`.
  *
  * Adapted from pi-headroom (MIT) by mslavov.
  * @see https://github.com/mslavov/pi-headroom
@@ -51,7 +51,7 @@ async function checkHealth(): Promise<boolean> {
 // ─── Proxy lifecycle (auto-manage) ───────────────────────────────────
 
 export const IS_WINDOWS = process.platform === "win32";
-export const VENV_DIR = join(homedir(), ".pi", "headroom-venv");
+export const VENV_DIR = join(homedir(), ".stratum", "headroom-venv");
 export const VENV_BIN = IS_WINDOWS
   ? join(VENV_DIR, "Scripts")
   : join(VENV_DIR, "bin");

@@ -1,10 +1,11 @@
 import { browser } from '$app/environment';
 import { remult } from 'remult';
-import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
-import { ActiveStream } from '@opaius/shared/entities/active-stream.js';
-import { AgentService } from '@opaius/shared/controllers/agent-service.js';
+import { ChatMessage } from '@stratum/shared/entities/chat-message.js';
+import { ActiveStream } from '@stratum/shared/entities/active-stream.js';
+import { AgentService } from '@stratum/shared/controllers/agent-service.js';
 import { isThoughtWorthDisplaying, parseThinking } from '$lib/utils/thinking.js';
 import { safeRandomUUID } from '$lib/utils/uuid.js';
+import { createLiveQuery } from '$lib/stores/live-query.svelte.js';
 const INITIAL_MESSAGE_LIMIT = 50;
 const MIN_MORE_MESSAGES = 20;
 const ESTIMATED_MESSAGE_HEIGHT = 150;
@@ -34,6 +35,7 @@ export interface EnrichedMessage {
 	cacheWriteTokens?: number;
 	contextMessages?: number;
 	isFinal?: boolean;
+	checkpointHash?: string;
 }
 
 // ── Helper: group messages, thinking, and tool results ──
@@ -109,6 +111,9 @@ function getDisplayMessages(msgs: ChatMessage[], streams: ActiveStream[] = []): 
 			if (m.headroomRatio && m.headroomRatio < 1) {
 				lastAssistantMsg.headroomRatio = m.headroomRatio;
 			}
+			if (m.checkpointHash) {
+				lastAssistantMsg.checkpointHash = m.checkpointHash;
+			}
 		} else {
 			const display: EnrichedMessage = {
 				id: m.id,
@@ -121,7 +126,8 @@ function getDisplayMessages(msgs: ChatMessage[], streams: ActiveStream[] = []): 
 				outputTokens: m.outputTokens ?? 0,
 				cacheReadTokens: m.cacheReadTokens ?? 0,
 				cacheWriteTokens: m.cacheWriteTokens ?? 0,
-				contextMessages: m.contextMessages ?? 0
+				contextMessages: m.contextMessages ?? 0,
+				checkpointHash: m.checkpointHash
 			};
 
 			for (const block of blocks) {
@@ -215,15 +221,46 @@ export function createChatSession(
 	initialMessages?: ChatMessage[]
 ): ChatSession {
 	let sessionId = $state<string | null>(initialSession ?? null);
-	let messages = $state<ChatMessage[]>(initialMessages ?? []);
-	let activeStreams = $state<ActiveStream[]>([]);
+	let currentLimit = $state(INITIAL_MESSAGE_LIMIT);
+	let localMessages = $state<ChatMessage[]>(initialMessages ?? []);
 	let isSending = $state(false);
 	let isLoadingMore = $state(false);
-	let error = $state('');
-	let currentLimit = $state(INITIAL_MESSAGE_LIMIT);
 	let hasMore = $state(false);
+	let customError = $state('');
 
-	let unsubs: (() => void)[] = [];
+	const messagesQuery = createLiveQuery<ChatMessage>(() =>
+		sessionId
+			? {
+					repo: remult.repo(ChatMessage),
+					options: {
+						where: { sessionId },
+						orderBy: { sortOrder: 'desc' as const },
+						limit: currentLimit
+					}
+				}
+			: null
+	);
+
+	const messages = $derived.by(() => {
+		if (messagesQuery.data && messagesQuery.data.length > 0) {
+			return [...messagesQuery.data].reverse();
+		}
+		return localMessages;
+	});
+
+	const activeStreamsQuery = createLiveQuery<ActiveStream>(() =>
+		sessionId
+			? {
+					repo: remult.repo(ActiveStream),
+					options: {
+						where: { sessionId },
+						orderBy: { createdAt: 'asc' as const }
+					}
+				}
+			: null
+	);
+
+	const activeStreams = $derived(activeStreamsQuery.data);
 
 	function messagesPerViewport(): number {
 		const height = typeof window !== 'undefined' ? window.innerHeight : 720;
@@ -242,58 +279,17 @@ export function createChatSession(
 			});
 	}
 
-	function subscribe(sid: string, limitVal = currentLimit): Promise<void> {
-		if (!sid) return Promise.resolve();
-		currentLimit = limitVal;
-		for (const u of unsubs) u();
-		unsubs = [];
-		const hasMorePromise = refreshHasMore(sid, limitVal);
+	$effect(() => {
+		if (browser && sessionId) {
+			void refreshHasMore(sessionId, currentLimit);
+		}
+	});
 
-		unsubs.push(
-			remult
-				.repo(ChatMessage)
-				.liveQuery({
-					where: { sessionId: sid },
-					orderBy: { sortOrder: 'desc' as const },
-					limit: limitVal
-				})
-				.subscribe({
-					next: (info) => {
-						const nextMessages = [...info.items].reverse();
-						if (nextMessages.length > 0 || messages.length === 0) {
-							messages = nextMessages;
-							void refreshHasMore(sid, currentLimit);
-						}
-					},
-					error: (err) => {
-						error = err instanceof Error ? err.message : String(err);
-					}
-				})
-		);
-		unsubs.push(
-			remult
-				.repo(ActiveStream)
-				.liveQuery({ where: { sessionId: sid }, orderBy: { createdAt: 'asc' as const } })
-				.subscribe({
-					next: (info) => {
-						activeStreams = [...info.applyChanges(activeStreams)];
-					},
-					error: (err) => {
-						error = err instanceof Error ? err.message : String(err);
-					}
-				})
-		);
-		return hasMorePromise;
-	}
-
-	// svelte-ignore state_referenced_locally
-	if (browser && sessionId) {
-		// svelte-ignore state_referenced_locally
-		const initSid = sessionId;
-		queueMicrotask(() => {
-			void subscribe(initSid, currentLimit);
-		});
-	}
+	$effect(() => {
+		if (!messagesQuery.loading) {
+			isLoadingMore = false;
+		}
+	});
 
 	return {
 		get sessionId() {
@@ -318,26 +314,20 @@ export function createChatSession(
 			return hasMore;
 		},
 		get error() {
-			return error;
+			return customError || messagesQuery.error || activeStreamsQuery.error || '';
 		},
 
 		switchSession(newId: string, initialMessages?: ChatMessage[]) {
 			if (sessionId === newId) return;
 			sessionId = newId;
-			if (initialMessages) {
-				messages = initialMessages;
-			} else {
-				messages = [];
-			}
-			void subscribe(newId, INITIAL_MESSAGE_LIMIT);
+			localMessages = initialMessages ?? [];
+			currentLimit = INITIAL_MESSAGE_LIMIT;
 		},
 
 		loadMore(extraMessages = messagesPerViewport()) {
 			if (!sessionId || !hasMore || isLoadingMore) return;
 			isLoadingMore = true;
-			void subscribe(sessionId, currentLimit + extraMessages).finally(() => {
-				isLoadingMore = false;
-			});
+			currentLimit += extraMessages;
 		},
 
 		async send(prompt: string) {
@@ -345,35 +335,30 @@ export function createChatSession(
 			if (!sid) {
 				sid = safeRandomUUID();
 				sessionId = sid;
-				await subscribe(sid, currentLimit);
 			}
 			isSending = true;
-			error = '';
+			customError = '';
 			try {
 				await AgentService.ask(prompt, sid);
 			} catch (err: unknown) {
-				error = err instanceof Error ? err.message : String(err);
+				customError = err instanceof Error ? err.message : String(err);
 			} finally {
 				isSending = false;
 			}
 		},
 
 		reset() {
-			for (const u of unsubs) u();
-			unsubs = [];
 			sessionId = null;
-			messages = [];
-			activeStreams = [];
+			localMessages = [];
 			isSending = false;
 			isLoadingMore = false;
 			hasMore = false;
-			error = '';
+			customError = '';
 			currentLimit = INITIAL_MESSAGE_LIMIT;
 		},
 
 		destroy() {
-			for (const u of unsubs) u();
-			unsubs = [];
+			// Auto-unsubscribed by createLiveQuery $effect cleanup
 		}
 	};
 }

@@ -1,5 +1,5 @@
 import { remult } from "remult";
-import { ChatMessage } from "@opaius/shared/entities/chat-message.js";
+import { ChatMessage } from "@stratum/shared/entities/chat-message.js";
 import type { Context, Message } from "./types.js";
 import type { AgentConfig } from "./types.js";
 import { toolRegistry } from "./agent-tools.js";

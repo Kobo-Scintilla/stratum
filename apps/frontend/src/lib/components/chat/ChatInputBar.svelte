@@ -1,12 +1,13 @@
 <script lang="ts">
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
 	import Icon from '$lib/components/Icon.svelte';
 	import { AiBrain05Icon } from '@hugeicons/core-free-icons';
 	import ChatInput from '$lib/components/chat/ChatInput.svelte';
-	import type { ChatMessage } from '@opaius/shared/entities/chat-message.js';
+	import type { ChatMessage } from '@stratum/shared/entities/chat-message.js';
 	import type { ChatSession } from '$lib/stores/chat-session.svelte.js';
-	import type { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
+	import type { ChatSessionSettings } from '@stratum/shared/entities/chat-session-settings.js';
 
 	let {
 		chat,
@@ -276,48 +277,69 @@
 			{@render thinkingSelector()}
 			{@render modelSelector()}
 			{#if ctxTokens > 0}
-				<div
-					class="relative flex items-center justify-center"
-					title="Context: {ctxPct}% ({ctxTokens.toLocaleString()}/{ctxWindow.toLocaleString()} tokens)"
-				>
-					<svg class="size-5" viewBox="0 0 42 42">
-						<circle
-							cx="21"
-							cy="21"
-							r="18"
-							stroke="currentColor"
-							class="text-muted-foreground/15"
-							stroke-width="4"
-							fill="none"
-						/>
-						<circle
-							cx="21"
-							cy="21"
-							r="18"
-							stroke="currentColor"
-							class={ctxPct >= 90
-								? 'text-destructive'
-								: ctxPct >= 75
-									? 'text-amber-500'
-									: 'text-primary'}
-							stroke-width="4"
-							stroke-dasharray="{ctxPct}, 100"
-							stroke-linecap="round"
-							stroke-dashoffset="25"
-							fill="none"
-							transform="rotate(-90 21 21)"
-						/>
-						<text
-							x="21"
-							y="25"
-							text-anchor="middle"
-							font-size="6.5"
-							font-weight="800"
-							fill="currentColor"
-							class="text-foreground tabular-nums">{ctxPct}</text
+				<HoverCard.Root openDelay={100} closeDelay={150}>
+					<HoverCard.Trigger>
+						<div
+							class="relative flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
 						>
-					</svg>
-				</div>
+							<svg class="size-5" viewBox="0 0 42 42">
+								<circle
+									cx="21"
+									cy="21"
+									r="18"
+									stroke="currentColor"
+									class="text-muted-foreground/15"
+									stroke-width="4"
+									fill="none"
+								/>
+								<circle
+									cx="21"
+									cy="21"
+									r="18"
+									stroke="currentColor"
+									class={ctxPct >= 90
+										? 'text-destructive'
+										: ctxPct >= 75
+											? 'text-amber-500'
+											: 'text-primary'}
+									stroke-width="4"
+									stroke-dasharray="{ctxPct}, 100"
+									stroke-linecap="round"
+									stroke-dashoffset="25"
+									fill="none"
+									transform="rotate(-90 21 21)"
+								/>
+								<text
+									x="21"
+									y="24.5"
+									text-anchor="middle"
+									font-size="9.5"
+									font-weight="800"
+									fill="currentColor"
+									class="text-foreground tabular-nums">{ctxPct}</text
+								>
+							</svg>
+						</div>
+					</HoverCard.Trigger>
+					<HoverCard.Content class="w-64 border-border/40 p-3 shadow-lg bg-card/95 backdrop-blur-md">
+						<div class="space-y-1.5">
+							<h4 class="text-xs font-semibold text-foreground">Active Context Window</h4>
+							<p class="text-[10px] leading-relaxed text-muted-foreground">
+								Current context fills <strong class="text-primary">{ctxPct}%</strong> of the model's capacity.
+							</p>
+							<div class="border-t border-border/15 pt-1.5 mt-1.5 space-y-1">
+								<div class="flex justify-between text-[9px] text-muted-foreground">
+									<span>Used Tokens:</span>
+									<span class="font-mono text-foreground font-medium">{ctxTokens.toLocaleString()}</span>
+								</div>
+								<div class="flex justify-between text-[9px] text-muted-foreground">
+									<span>Limit:</span>
+									<span class="font-mono text-foreground font-medium">{ctxWindow.toLocaleString()}</span>
+								</div>
+							</div>
+						</div>
+					</HoverCard.Content>
+				</HoverCard.Root>
 			{/if}
 		</div>
 	{/if}

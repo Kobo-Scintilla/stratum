@@ -3,9 +3,9 @@
 	import { useDashboardState } from '$lib/stores/dashboard-state.svelte.js';
 	import { remult } from 'remult';
 	import Button from '../ui/button/button.svelte';
-	import { AgentService } from '@opaius/shared/controllers/agent-service.js';
-	import { ChatSessionSettings } from '@opaius/shared/entities/chat-session-settings.js';
-	import { ChatMessage } from '@opaius/shared/entities/chat-message.js';
+	import { AgentService } from '@stratum/shared/controllers/agent-service.js';
+	import { ChatSessionSettings } from '@stratum/shared/entities/chat-session-settings.js';
+	import { ChatMessage } from '@stratum/shared/entities/chat-message.js';
 	import { MessageMultiple02FreeIcons, PlusSignIcon } from '@hugeicons/core-free-icons';
 	import Icon from '../Icon.svelte';
 	import { page } from '$app/state';
@@ -14,6 +14,8 @@
 	import { getChatSession } from '$lib/stores/chat-session.svelte.js';
 	import * as ScrollArea from '$lib/components/ui/scroll-area/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import { createLiveQuery } from '$lib/stores/live-query.svelte.js';
+	import { browser } from '$app/environment';
 
 	interface Session {
 		sessionId: string;
@@ -26,36 +28,35 @@
 
 	const dashboard = useDashboardState();
 	const chat = getChatSession();
-	let liveSessionSettings = $state(new Map<string, ChatSessionSettings>());
-
-	$effect(() => {
-		return remult
-			.repo(ChatSessionSettings)
-			.liveQuery({})
-			.subscribe({
-				next: (info) => {
-					const settings = new Map<string, ChatSessionSettings>();
-					for (const setting of info.items) {
-						settings.set(setting.id, setting);
-					}
-					liveSessionSettings = settings;
-				}
-			});
+	const liveSessionSettingsQuery = createLiveQuery<
+		ChatSessionSettings,
+		Map<string, ChatSessionSettings>
+	>(() => ({ repo: remult.repo(ChatSessionSettings) }), {
+		initial: new Map<string, ChatSessionSettings>(),
+		reducer: (info) => {
+			const settings = new Map<string, ChatSessionSettings>();
+			for (const setting of info.items) {
+				settings.set(setting.id, setting);
+			}
+			return settings;
+		}
 	});
+	const liveSessionSettings = $derived(liveSessionSettingsQuery.data);
+
+	const lastMessageQuery = createLiveQuery<ChatMessage>(() =>
+		dashboard.activeTab === 'sessions'
+			? {
+					repo: remult.repo(ChatMessage),
+					options: { limit: 1, orderBy: { createdAt: 'desc' as const } }
+				}
+			: null
+	);
 
 	$effect(() => {
-		if (dashboard.activeTab !== 'sessions') return;
-		return remult
-			.repo(ChatMessage)
-			.liveQuery({
-				limit: 1,
-				orderBy: { createdAt: 'desc' as const }
-			})
-			.subscribe({
-				next: () => {
-					dashboard.refreshSessions();
-				}
-			});
+		const _ = lastMessageQuery.data;
+		if (browser && !lastMessageQuery.loading) {
+			dashboard.refreshSessions();
+		}
 	});
 
 	function timeAgo(iso: string, now: number): string {

@@ -2,7 +2,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useDashboardState } from '$lib/stores/dashboard-state.svelte.js';
 	import { remult } from 'remult';
-	import { AgentService } from '@opaius/shared/controllers/agent-service.js';
+	import { AgentService } from '@stratum/shared/controllers/agent-service.js';
 	import { Settings02FreeIcons } from '@hugeicons/core-free-icons';
 	import Icon from '../Icon.svelte';
 	import SidebarProviderSearch from './SidebarProviderSearch.svelte';

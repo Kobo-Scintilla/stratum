@@ -45,8 +45,18 @@ export const toolRegistry = new ToolRegistry();
 
 toolRegistry.register(getTimeTool);
 
-// Register OMP SDK tools (read, write, edit, bash, search)
-const piTools = getPiCodingTools(process.cwd());
+import os from "node:os";
+import path from "node:path";
+import fs from "node:fs";
+
+const workspaceDir = process.env.STRATUM_WORKSPACE_DIR || path.join(os.homedir(), ".stratum", "workspace");
+if (!fs.existsSync(workspaceDir)) {
+  fs.mkdirSync(workspaceDir, { recursive: true });
+}
+
+// Register OMP SDK tools (read, write, edit, bash, search) in the stratum workspace
+const piTools = getPiCodingTools(workspaceDir);
 for (const tool of piTools) {
   toolRegistry.register(tool);
 }
+

@@ -14,6 +14,8 @@ Manages the core pi-ai agent execution loop, tool definitions, prompt context bu
 - Headroom uses session override first, then `AppSettings.defaultHeadroomEnabled`, then `true`; passes the selected model and optional token budget to the proxy.
 - Headroom proxy URL is read from `HEADROOM_BASE_URL` first, then `HEADROOM_URL`, then the local default port.
 - Persists headroom compression stats directly on historical `ChatMessage` records.
+- Execution Workspace: The agent tools and shell commands execute inside `~/.stratum/workspace` as cwd.
+
 
 # Work Guidance
 

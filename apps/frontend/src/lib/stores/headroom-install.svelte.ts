@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { remult } from 'remult';
-import { AgentService } from '@opaius/shared/controllers/agent-service.js';
+import { AgentService } from '@stratum/shared/controllers/agent-service.js';
 import { toast } from 'svelte-sonner';
 
 export interface HeadroomInstallStore {
