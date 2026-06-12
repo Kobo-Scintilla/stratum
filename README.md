@@ -1,179 +1,329 @@
-# Stratum
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Kobo-Scintilla/stratum/raw/main/apps/frontend/static/logo.png">
+    <img src="https://github.com/Kobo-Scintilla/stratum/raw/main/apps/frontend/static/logo.png" alt="Stratum" width="120">
+  </picture>
+</p>
 
-> **Bespoke Workspace & Development Runtime by Kobo Scintilla**  
-> A hybrid local-remote agentic operating environment designed to bridge high-craft user interfaces with raw, developer-first AI autonomy.
+<h1 align="center">Stratum</h1>
+
+<p align="center">
+  <b>Agentic runtime & chat dashboard by <a href="https://github.com/Kobo-Scintilla">Kobo Scintilla</a></b><br>
+  <i>SvelteKit 5 · Hono · Remult · pi-ai · Headroom</i>
+</p>
+
+<p align="center">
+  <a href="#done"><img src="https://img.shields.io/badge/status-active-22d3ee?style=flat-square" alt="Status"></a>
+  <a href="#-work-in-progress"><img src="https://img.shields.io/badge/WIP-5_items-a78bfa?style=flat-square" alt="WIP"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-34d399?style=flat-square" alt="License"></a>
+</p>
 
 ---
 
-## 🌌 System Architecture
+Stratum is a **hybrid human–AI development runtime**. It pairs a responsive chat UI with an agent execution loop, tool sandbox, context compression, and reversibility safety gates. The monorepo is structured for iteration — what's done is real, what's planned is flagged.
 
-Stratum is a dual-tier agent runtime structured around a responsive client interface, a gateway coordinator, and isolated execution workspaces.
+## 🚦 What's Done vs What's Not
+
+| Layer | Status |
+|-------|--------|
+| Chat dashboard & session management | ✅ Done |
+| Agent streaming loop (pi-ai) | ✅ Done |
+| Tool execution sandbox (read/write/bash/search) | ✅ Done |
+| Headroom context compression | ✅ Done |
+| Git checkpoint safety gates (RBAG) | ✅ Done |
+| Multi-provider key management (30+ providers) | ✅ Done |
+| AES-256-GCM encrypted API keys | ✅ Done |
+| Thinking/reasoning levels & UI | ✅ Done |
+| **Tiered scoped memory (Mnemosyne)** | 🔶 Partial — session history only |
+| **Subagent branching & DAG** | 🔶 Partial — registry exists, single agent |
+| **Mirage Virtual Filesystem** | ❌ Not started |
+| **Electrobun desktop packaging** | ❌ Not started |
+| **SSHFS remote sync** | ❌ Not started |
+| **DeepResearch mode** | ❌ Not started |
+| **Subagent Kanban UI** | ❌ Not started |
+
+---
+
+## 🧱 System Architecture
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Kobo-Scintilla/stratum/raw/main/docs/architecture.svg">
+    <img src="https://github.com/Kobo-Scintilla/stratum/raw/main/docs/architecture.svg" alt="Stratum Architecture" width="100%">
+  </picture>
+</p>
+
+*Animated SVG — data flow dots pulse along connection lines. Open in browser to see animation.*
 
 ```mermaid
 graph TB
-    Client["Kobo Scintilla UI<br>(SvelteKit 5 / Electrobun)"]
-    Gateway["Stratum Hono Gateway<br>(SQLite, AES Key-Store)"]
-    
-    subgraph Workspaces ["Execution Boundaries"]
-        Local["Local Workspace<br>(~/.stratum/workspace)"]
-        Remote["Remote Host VM<br>(SSHFS / SSH Sync Mount)"]
+    Client["SvelteKit 5 UI<br>(Port 5173)"]
+    Gateway["Hono Gateway<br>(Port 3001)"]
+    SQLite[("SQLite<br>db.sqlite")]
+
+    subgraph Runtime ["Agent Runtime"]
+        Loop["pi-ai Stream Loop"]
+        Tools["Tool Sandbox<br>read/write/bash/search"]
+        Headroom["Headroom Proxy<br>(Context Compression)"]
+        Checkpoints["Git Checkpoints<br>(RBAG Safety Gates)"]
     end
 
-    Client <-->|SSE & Remult Client| Gateway
-    Gateway <-->|Tool Runner CWD| Local
-    Gateway <-->|VFS Sync| Remote
-    
-    style Client fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
-    style Gateway fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
-    style Local fill:#0f172a,stroke:#0d9488,stroke-dasharray: 5 5,color:#fff
-    style Remote fill:#0f172a,stroke:#a855f7,stroke-dasharray: 5 5,color:#fff
+    Client <-->|SSE + Remult CRUD| Gateway
+    Gateway -->|Remult ORM| SQLite
+    Gateway --> Loop
+    Loop -->|Tool Calls| Tools
+    Loop -->|Compression| Headroom
+    Loop -->|Pre/Post Tool| Checkpoints
+    Tools -->|Scope: ~/.stratum/workspace| Workspace["Workspace Dir"]
+
+    style Client fill:#1e293b,stroke:#22d3ee,stroke-width:2px,color:#fff
+    style Gateway fill:#1e293b,stroke:#34d399,stroke-width:2px,color:#fff
+    style SQLite fill:#1e293b,stroke:#a78bfa,stroke-width:2px,color:#fff
 ```
 
-* **Frontend Client:** Built using Svelte 5 and SvelteKit, executing inside an Electrobun window wrapper for local system integration, hotkeys, and shell hooks.
-* **Hono Gateway:** Acts as the central agent execution loop, session coordinator, and key-management container.
-* **Execution Workspace:** The agent's file tools and terminal processes are restricted to `~/.stratum/workspace` (locally) or virtual mount points (remotely).
+### Components
+
+- **Frontend** — SvelteKit 5 dashboard with chat UI, session list, provider manager, settings. Dark petroleum/teal theme. Live queries via Remult SSE.
+- **Gateway** — Hono HTTP server. Hosts Remult REST + admin UI. Manages agent lifecycle, encryption, CORS.
+- **Agent Runtime** — pi-ai `streamSimple` loop with tool call round-trips. Handles text deltas, tool starts/ends, thinking markers, errors.
+- **Headroom** — Optional context compression via `headroom-ai[proxy]`. Auto-installs Python venv, spawns proxy. Configurable per session.
+- **Git Checkpoints** — Auto-commit workspace before tool execution. One-click rollback in UI. Preserves user dirty state across checkpoints.
 
 ---
 
-## 🧠 Tiered Scoped Memory Architecture (Mnemosyne)
-
-Memory in Stratum is structured hierarchically to restrict context pollution and maximize prompt precision. Rather than a flat text log, context is assembled dynamically from four scoped layers.
+## 🗄️ Data Model
 
 ```mermaid
-graph TD
-    Global["1. Global Memory<br>(User Prefs, API keys)"] --> Project["2. Project Memory<br>(Codebase Maps, AGENTS.md)"]
-    Project --> Agent["3. Agent-Type Memory<br>(Tool profiles, Prompts)"]
-    Agent --> Session["4. Session / Task Memory<br>(Local Git diffs, Traces)"]
-    
-    style Global fill:#1e293b,stroke:#0d9488,color:#fff
-    style Project fill:#1e293b,stroke:#3b82f6,color:#fff
-    style Agent fill:#1e293b,stroke:#8b5cf6,color:#fff
-    style Session fill:#1e293b,stroke:#ec4899,color:#fff
+erDiagram
+    ChatMessage {
+        string id PK
+        string sessionId FK
+        string role "user | assistant | tool"
+        string content
+        datetime createdAt
+        int sortOrder
+        json headroomStats
+    }
+    ActiveStream {
+        string id PK
+        string sessionId FK
+        string status "streaming | done | error"
+        string content
+        datetime createdAt
+    }
+    ProviderSetting {
+        string id PK "provider name"
+        string apiKey "AES encrypted"
+        bool enabled
+        string baseUrl
+        string apiType
+        string models
+    }
+    ChatSessionSettings {
+        string id PK "sessionId"
+        string title
+        string modelProvider
+        string modelId
+        int contextWindow
+        string thinkingLevel
+        bool headroomEnabled
+        bool pinned
+    }
+    AppSettings {
+        string id PK "_defaults"
+        string defaultModelProvider
+        string defaultModelId
+        bool defaultHeadroomEnabled
+    }
+
+    ChatMessage ||--o{ ActiveStream : "sessionId"
+    ChatSessionSettings ||--o{ ChatMessage : "id = sessionId"
 ```
 
-* **Global Memory:** Contains cross-session learnings, user preferences, and encrypted API configurations.
-* **Project Memory:** Defines codebase paths, directories, libraries, and active structural conventions parsed from root `AGENTS.md` files.
-* **Agent-Type Memory:** Scopes what tools the agent can execute (e.g. read-only, FS mutations, network calls).
-* **Session/Task Memory:** Holds active terminal buffers, tool outputs, and transient compiler warnings.
+Five Remult entities, SQLite with WAL mode. Indexed on `sessionId` and `sortOrder`.
 
 ---
 
-## 🌿 Subagent Branching Graph & Kanban UI
+## ✅ What's Done
 
-Subagent execution is modeled as a directed acyclic graph (DAG) representing parent-to-child delegation trees, synced with a branching Kanban workspace.
+### Chat Dashboard
+- Message list with streaming display, thinking blocks, tool call cards, Markdown rendering
+- Session sidebar: list, create, rename, pin, delete
+- Provider sidebar: search 30+ providers, add custom, set API key, enable/disable
+- Settings panel: default model, thinking level, Headroom toggles, title summary model
+- Live query SSE sync — real-time UI updates
+- Mobile-responsive sidebar sheet
+- Dark theme (AI Slate + Neon Teal + Verdigris)
+- Token usage stats per message
 
-```mermaid
-graph TD
-    Parent["Parent Architect Agent"] -->|delegates task| ChildA["Subagent A: Code Reviewer"]
-    Parent -->|delegates task| ChildB["Subagent B: Migrator"]
-    
-    ChildA -.->|sync channel| Shared[(Shared Learning Pool)]
-    ChildB -.->|sync channel| Shared
-    
-    style Parent fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
-    style ChildA fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style ChildB fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
-    style Shared fill:#0f172a,stroke:#3b82f6,color:#fff
-```
+### Agent Execution
+- Full pi-ai streaming loop with multi-turn tool execution
+- Tool sandbox: `read`, `write`, `edit`, `bash`, `search` (grep+find), `get_time`
+- All tools scoped to `~/.stratum/workspace`
+- Tool call round-trips: LLM → tool → result → LLM → done
+- Throttled SSE updates (100ms) to ActiveStream in DB
 
-* **Execution Graph:** Nodes represent individual subagents. Spawned subagents inherit parent context and tool subsets.
-* **Shared Learning Pool:** Subagents operating in parallel branches stream structural discoveries (e.g., locating a file, identifying an API bug) to a shared pool to prevent double-work.
+### Headroom Compression
+- Auto-detect Python, create venv, pip install `headroom-ai[proxy]`
+- Spawn proxy, health check polling, graceful SIGTERM shutdown
+- OpenAI message format bridge (pi-ai ↔ Headroom)
+- Session-level overrides: enabled, code AST, kompress model, CCR
+- Streaming install UI via SSE endpoint
+- Compression stats saved to both ActiveStream and ChatMessage
 
----
+### RBAG Safety Gates (Git Checkpoints)
+- `createCheckpoint()` — auto-init git repo, commit dirty state
+- `rollbackToCheckpoint()` — hard reset + clean, restore user dirty state
+- `completeCheckpoint()` — soft reset to merge user + agent changes
+- Integrated into `runStreamLoop()`: checkpoint before tools, finalize on new turn
+- `[Rollback Changes]` button in ChatMessage UI
+- Tested: 4 test cases (clean, dirty, rollback, complete)
 
-## 📂 Mirage Virtual Filesystem
+### Provider Management
+- 30+ built-in providers: OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, OpenRouter, etc.
+- Custom provider support (baseUrl, apiType, model list)
+- AES-256-GCM key encryption with scrypt derivation
+- Per-provider enable/disable toggle
 
-Stratum uses Mirage to virtualize integrations. Instead of creating custom tools for Slack, Gmail, GitHub, or Postgres, external services are mounted directly as virtual directories.
-
-```mermaid
-graph LR
-    Agent[Agent File Tools] -->|read / write / grep| Mount["/mount/mirage/"]
-    
-    subgraph Mirage VFS ["Mirage Virtual Filesystem"]
-        Mount --> Gmail["/emails/inbox/"]
-        Mount --> Slack["/slack/channels/"]
-        Mount --> Git["/github/prs/"]
-        Mount --> DB["/postgres/tables/"]
-    end
-    
-    style Agent fill:#1e293b,stroke:#0d9488,color:#fff
-    style Mount fill:#0f172a,stroke:#a855f7,color:#fff
-```
-
-* **Unified Input/Output:** Agents inspect emails by reading `/mount/mirage/emails/inbox/` and send responses by writing to `/mount/mirage/emails/outbox/`.
-* **Standard Tooling:** The agent searches Slack history or database schemas using standard shell `grep` and file reading commands, completely avoiding API code wrappers.
-
----
-
-## ⚡ Hybrid Dev Runtime & Electrobun Desktop App
-
-Stratum provides seamless switching between local execution and remote hosting using a virtual sync mechanism.
-
-* **Electrobun Desktop Wrapper:** A high-performance native desktop shell hosting the Svelte 5 frontend and spawning the gateway server.
-* **SSHFS Sync:** Mounts remote development servers, Docker containers, or staging host VMs. Files are synchronized in real-time, allowing the local agent to edit and run compilers remotely.
-* **DeepResearch mode:** Spawns specialized crawling agents to perform concurrent web searches, index API documentations, and ingest remote code examples.
+### Thinking / Reasoning
+- Extended levels: off / minimal / low / medium / high / xhigh
+- Stream parsing for `<|THINK_START|>` / `<|THINK_END|>` markers
+- Thought filtering (skip trivially short thoughts)
+- Visual `AgentActivity` component for thinking + tool call display
+- Collapsible thinking blocks
 
 ---
 
-## 🛡️ Reversibility-Based Safety Gates (RBAG)
+## 🔶 Partially Done
 
-To protect host systems while maintaining execution velocity, Stratum implements the **RBAG** safety gate workflow:
+### Mnemosyne Tiered Memory
+- **Claim:** 4 scoped layers (Global → Project → Agent-Type → Session)
+- **Reality:** Only session-level history exists — loads last 200 messages from SQLite
+- **Missing:** Global memory store, project memory parser (`AGENTS.md` ingestion), agent-type memory profiles
+- The concept is designed; the data structures aren't built yet
 
-1. **Pre-Execution Checkpoint:** Before write or terminal tools execute, the gateway creates a Git checkpoint in `~/.stratum/workspace` (committing dirty files silently if present).
-2. **Auto-Run Mode:** The agent modifies codebase files and runs compilers without intermediate prompting.
-3. **Rollback Hook:** Users can click `[Rollback Changes]` in the UI to instantly revert modifications to the pre-tool state, deleting untracked files and unstaging the original modifications.
-4. **Auto-Finalization:** Starting a new generation turn soft-resets the past checkpoint, merging both edits into the unstaged working tree.
-
----
-
-## 🚧 Active Roadmap & Work In Progress (WIP)
-
-While the core Hono Gateway, Svelte 5 UI, and RBAG Git Checkpoint system are fully implemented and verified, the following features are actively under development:
-
-* **Mnemosyne Memory System:** The gateway currently uses single-history context building; the tiered scoped layers are in active R&D.
-* **Subagent Kanban UI:** Subagents can be defined and spawned manually; the branching visual board interface is not yet wired to the frontend.
-* **Mirage VFS:** Virtual mounts for email, Slack, and databases are in mock mode; the FUSE/passthrough filesystem layer is under construction.
-* **Electrobun Packaging:** Currently runs locally via terminal node servers; native Electrobun desktop packaging is in compilation trials.
-* **Remote SSHFS Sync:** SSH remote VM file synchronizer is WIP.
+### Subagent System
+- **Claim:** Parent-child DAG, branching execution, shared learning pool
+- **Reality:** `AgentRegistry` class exists (register/get/list) but only one agent ("assistant") is registered
+- **Missing:** Subagent spawning, parent-child tracking, DAG data structure, shared pool channel
 
 ---
 
-## 🛠️ Monorepo Structure
+## 🚧 Work In Progress
 
-Stratum is structured as a Turborepo using Bun workspaces:
+These features are described in the vision but have **zero implementation** yet:
+
+| Feature | Description |
+|---------|-------------|
+| **Mirage VFS** | Mount external services (Gmail, Slack, GitHub, Postgres) as virtual directories under `/mount/mirage/`. Agents use `read`/`write`/`grep` on them. No API code needed. |
+| **Electrobun Desktop** | Native desktop shell hosting the SvelteKit frontend. System tray, global hotkeys, shell hooks. |
+| **SSHFS Remote Sync** | Mount remote VMs, Docker containers, staging hosts via SSH. Real-time file sync for local agent editing on remote targets. |
+| **DeepResearch Mode** | Spawn crawling agents for concurrent web search, API doc indexing, remote code ingestion. |
+| **Subagent Kanban UI** | Visual branching graph + Kanban board for subagent execution trees. Sync to GitHub Projects. |
+
+---
+
+## 📁 Monorepo Structure
 
 ```
 stratum/
 ├── apps/
-│   ├── frontend/     # SvelteKit 5 UI (Neon Teal & AI Slate theme)
-│   └── gateway/      # Hono + Remult + pi-ai backend controller
+│   ├── frontend/        # SvelteKit 5 UI
+│   │   ├── src/
+│   │   │   ├── lib/
+│   │   │   │   ├── components/     # Chat, sidebar, UI primitives
+│   │   │   │   ├── stores/         # Svelte 5 runes state
+│   │   │   │   ├── hooks/          # is-mobile
+│   │   │   │   ├── server/         # Encryption utils
+│   │   │   │   └── utils/          # Thinking, UUID, portal
+│   │   │   └── routes/             # Dashboard, API remult catch-all
+│   │   └── static/                 # Logo, favicon
+│   ├── gateway/          # Hono + Remult + pi-ai backend
+│   │   └── src/
+│   │       ├── agent-runtime/
+│   │       │   ├── tools/          # Tool definitions (get-time.ts)
+│   │       │   ├── headroom/       # Proxy, format bridge, compression
+│   │       │   ├── __tests__/      # Git checkpoint, Headroom tests
+│   │       │   ├── agent-stream.ts # pi-ai loop orchestration
+│   │       │   ├── agent-tools.ts  # Tool registry
+│   │       │   ├── agent-context.ts# Context builder
+│   │       │   ├── agent-registry.ts
+│   │       │   └── git-checkpoint.ts
+│   │       ├── agent-service.ts    # Remult controller
+│   │       ├── api.ts              # Remult API setup
+│   │       ├── encryption.ts       # AES-256-GCM
+│   │       └── index.ts            # Hono server entry
+│   └── ...shared symlinks
 ├── packages/
-│   └── shared/       # Shared Remult entities & TypeScript types
-└── package.json      # Monorepo configuration
+│   └── shared/          # Shared Remult entities & types
+│       └── src/
+│           ├── controllers/        # AgentService definition
+│           └── entities/           # ChatMessage, ActiveStream, etc.
+├── build/                # Production build output
+├── turbo.json            # Turborepo config
+└── package.json          # Bun workspaces monorepo
 ```
 
 ---
 
-## 🚀 Development Commands
+## 🚀 Quick Start
 
 ```bash
-# Install dependencies
+# Prerequisites: bun, node 20+, python3 (for Headroom)
+
+# Install
 bun install
 
 # Start both gateway and frontend
-bun run dev          # Runs turbo run dev
+bun run dev
 
-# Run individual workspaces
-cd apps/gateway && bun dev       # Hono backend (port 3001)
-cd apps/frontend && bun dev      # SvelteKit (port 5173)
+# Or run individually:
+cd apps/gateway && bun dev          # Gateway on :3001
+cd apps/frontend && bun dev         # SvelteKit on :5173
 
-# Build the project
+# Build
 bun run build
 
-# Run safety gate verification tests
+# Run tests (gateway)
 cd apps/gateway && bun test
+```
+
+**Environment variables:**
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `GATEWAY_PORT` | `3001` | Gateway HTTP port |
+| `DATABASE_URL` | `db.sqlite` | SQLite database path |
+| `ENCRYPTION_KEY` | (auto-generated) | AES-256-GCM key for API keys |
+| `HEADROOM_BASE_URL` | `http://127.0.0.1:5050` | Headroom proxy URL |
+| `STRATUM_WORKSPACE_DIR` | `~/.stratum/workspace` | Tool execution sandbox |
+
+---
+
+## 🧪 Tests
+
+```bash
+# Gateway tests
+cd apps/gateway && bun test
+
+# Test files:
+# - src/agent-runtime/__tests__/git-checkpoint.test.ts
+# - src/agent-runtime/headroom/__tests__/headroom.test.ts
+# - tools-archive/__tests__/ (legacy tool tests)
 ```
 
 ---
 
-*Kobo Scintilla — High-Craft Human-AI Runtimes.*
+## 📌 Status Tags
+
+```
+✅ Done       — Fully implemented and verified
+🔶 Partial    — Implemented but incomplete
+❌ Not started — Planned, zero code
+```
+
+---
+
+<p align="center">
+  <sub>Built by <a href="https://github.com/Kobo-Scintilla">Kobo Scintilla</a> · Pre-alpha · 2026</sub>
+</p>
