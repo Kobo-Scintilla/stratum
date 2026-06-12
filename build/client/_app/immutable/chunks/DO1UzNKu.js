@@ -1,1 +1,0 @@
-function e(e){let t={};for(let[n,r]of e.entries())t[n]=r;return t}export{e as t};

@@ -1,1 +1,0 @@
-{"version":3,"file":"_page.svelte-BP2EdQl3.js","sources":["../../../.svelte-kit/adapter-node/entries/pages/_page.svelte.js"],"sourcesContent":["import \"../../chunks/dev.js\";\n//#region src/routes/+page.svelte\nfunction _page($$renderer) {}\n//#endregion\nexport { _page as default };\n"],"names":[],"mappings":"AACA;AACA,SAAS,KAAK,CAAC,UAAU,EAAE,CAAC;;;;"}
