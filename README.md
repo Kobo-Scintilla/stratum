@@ -1,6 +1,6 @@
 # Stratum
 
-> **Bespoke Workspace & Development Runtime by Atelier Scintilla**  
+> **Bespoke Workspace & Development Runtime by Kobo Scintilla**  
 > A hybrid local-remote agentic operating environment designed to bridge high-craft user interfaces with raw, developer-first AI autonomy.
 
 ---
@@ -9,25 +9,7 @@
 
 Stratum is not another conversational wrapper. It is an agentic development runtime built on the belief that **software tools should feel premium, responsive, and mathematically sound**. We do not model AI agents after human minds; we model them as scoped, virtual engines operating within strict physical and virtual boundaries.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    Atelier Scintilla                     │
-│                        (Desktop)                         │
-└────────────────────────────┬─────────────────────────────┘
-                             │ (SSE / Remult Client)
-                             ▼
-┌──────────────────────────────────────────────────────────┐
-│                   Stratum Hono Gateway                   │
-│         (SQLite, AES Keys, Policy-Based Outbox)          │
-└────────────────────────────┬─────────────────────────────┘
-                             │
-            ┌────────────────┴────────────────┐
-            ▼ (Local Run)                     ▼ (Remote sshfs Sync)
-┌───────────────────────┐         ┌───────────────────────┐
-│     Local Workspace   │         │    Remote Host VM     │
-│  ~/.stratum/workspace │         │    Virtual Mount      │
-└───────────────────────┘         └───────────────────────┘
-```
+![Stratum Architecture Diagram](./apps/frontend/static/stratum_architecture.png)
 
 ---
 
@@ -63,19 +45,7 @@ Rather than treating AI memory as a human-like stream of consciousness, Stratum 
 
 Traditional Kanban boards are flat and unsuited for parallel agent task execution. Stratum visualizes operations as a **branching execution tree** representing parent-to-child subagent delegations.
 
-```mermaid
-graph TD
-    ParentAgent["Parent Agent: Main Architect"] -->|spawns| SubAgent1["Subagent A: Code Reviewer"]
-    ParentAgent -->|spawns| SubAgent2["Subagent B: DB Migrator"]
-    
-    SubAgent1 -.->|shared memory channel| SharedMem[(Shared Memory & Learnings)]
-    SubAgent2 -.->|shared memory channel| SharedMem
-    
-    style ParentAgent fill:#1e293b,stroke:#0d9488,stroke-width:2px,color:#fff
-    style SubAgent1 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
-    style SubAgent2 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
-    style SharedMem fill:#0f172a,stroke:#0d9488,stroke-width:1px,color:#fff
-```
+![Subagent Branching Memory Graph](./apps/frontend/static/subagent_branches.png)
 
 * **Branching Delegation:** Watch subagents fork to run checks, compile code, or research documentation concurrently.
 * **Kanban-Graph Hybrid:** Tasks flow through columns, but remain visually linked to the parent subagent node that spawned them.
@@ -153,4 +123,4 @@ cd apps/gateway && bun test
 
 ---
 
-*Atelier Scintilla — High-Craft Human-AI Runtimes.*
+*Kobo Scintilla — High-Craft Human-AI Runtimes.*
