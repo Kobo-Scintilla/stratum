@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { api } from "./api.js";
+import { auth } from "./auth.js";
 import { streamText } from "hono/streaming";
 import { spawn } from "node:child_process";
 import { VENV_PYTHON } from "./agent-runtime/headroom/proxy.js";
@@ -9,6 +10,7 @@ import { AgentService } from "./agent-service.js";
 
 const app = new Hono();
 
+// CORS: frontend dev server
 app.use(
   "/*",
   cors({
@@ -17,7 +19,13 @@ app.use(
   }),
 );
 
+// Remult API
 app.route("", api);
+
+// better-auth handler: /api/auth/* (after Remult to ensure it catches /api/auth/*)
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
+  return auth.handler(c.req.raw);
+});
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 

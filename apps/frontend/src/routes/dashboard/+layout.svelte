@@ -4,9 +4,12 @@
 	import { headroomInstallStore } from '$lib/stores/headroom-install.svelte.js';
 	import MobileSidebarSheet from '$lib/components/sidebar/MobileSidebarSheet.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+import { tPageIn, tPageOut } from '$lib/transitions.js';
 
 	let { children, data } = $props();
 
+	// SSR user data from hooks.server.ts (via root +layout.server.ts)
+	let sessionData = $derived(data.user ? { user: data.user } : null);
 	// svelte-ignore state_referenced_locally
 	if (data.headroomFeatures) {
 		// svelte-ignore state_referenced_locally
@@ -44,9 +47,11 @@
 </script>
 
 <Sidebar.Provider style="--sidebar-width: 350px;" bind:open={sidebarOpen}>
-	<AppSidebar />
+	<AppSidebar sessionData={sessionData} />
 	<MobileSidebarSheet />
 	<Sidebar.Inset class="bg-transparent!">
-		{@render children?.()}
+		<div in:tPageIn out:tPageOut>
+			{@render children?.()}
+		</div>
 	</Sidebar.Inset>
 </Sidebar.Provider>

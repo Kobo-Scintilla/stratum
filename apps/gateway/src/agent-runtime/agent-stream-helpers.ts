@@ -60,6 +60,7 @@ export async function updateActiveStream(
 
 export async function insertAssistantMessage(
   sessionId: string,
+  ownerId: string,
   text: string,
   toolCalls: TrackedToolCall[],
   sortOrder: number,
@@ -76,6 +77,7 @@ export async function insertAssistantMessage(
   return await remult.repo(ChatMessage).insert({
     id: crypto.randomUUID(),
     sessionId,
+    ownerId,
     role: "assistant",
     content: text,
     toolCalls:
@@ -113,11 +115,13 @@ export async function insertActiveStream(
 
 export async function insertUserMessage(
   sessionId: string,
+  ownerId: string,
   content: string,
 ): Promise<void> {
   await remult.repo(ChatMessage).insert({
     id: crypto.randomUUID(),
     sessionId,
+    ownerId,
     role: "user",
     content,
     sortOrder: Date.now(),

@@ -5,13 +5,17 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "check": "turbo run check",
-    "lint": "turbo run lint"
+    "lint": "biome check .",
+    "format": "biome format . --write",
+    "check": "bun run check:deps && bun run check:lint",
+    "check:deps": "syncpack lint",
+    "check:lint": "biome check .",
+    "check:fix": "syncpack fix && biome check --write --unsafe . && biome format . --write",
+    "check:all": "bun run check && cd apps/gateway && bunx tsc --noEmit && cd ../.. && cd apps/frontend && bun run check"
   },
   "devDependencies": {
-    "prettier": "^3.8.1",
-    "prettier-plugin-svelte": "^3.5.1",
-    "prettier-plugin-tailwindcss": "^0.7.2",
+    "@biomejs/biome": "^2.5.0",
+    "syncpack": "^15.3.2",
     "turbo": "^2.9.0",
     "typescript": "^6.0.2"
   },
@@ -19,5 +23,10 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@nerdfolio/remult-better-auth": "^0.4.3",
+    "better-auth": "^1.6.19",
+    "kysely": "^0.29.2"
+  }
 }

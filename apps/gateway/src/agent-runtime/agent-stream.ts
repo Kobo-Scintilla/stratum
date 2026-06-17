@@ -394,8 +394,10 @@ export async function runStreamLoop(
     // ── Save assistant message to DB for history ──
     let savedMsg: ChatMessage | null = null;
     if (state.accumulatedText || state.toolCalls.length > 0) {
+      const userId = remult.user?.id || "";
       savedMsg = await insertAssistantMessage(
         sessionId,
+        userId,
         state.accumulatedText,
         state.toolCalls,
         Date.now(),

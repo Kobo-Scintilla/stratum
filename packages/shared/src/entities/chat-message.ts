@@ -19,6 +19,9 @@ export class ChatMessage {
   sessionId = "default";
 
   @Fields.string()
+  ownerId = "";
+
+  @Fields.string()
   role: "user" | "assistant" | "tool" = "user";
 
   @Fields.string()
@@ -72,4 +75,3 @@ export class ChatMessage {
   @Fields.string()
   checkpointHash?: string = undefined;
 }
-

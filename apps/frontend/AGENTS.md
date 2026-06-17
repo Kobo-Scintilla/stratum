@@ -1,6 +1,6 @@
 # Purpose
 
-SvelteKit 5 UI providing the chat interface, session history, provider configuration, and dashboard.
+SvelteKit 5 UI providing chat interface, session history, provider configuration, dashboard, and multi-user auth.
 
 # Ownership
 
@@ -9,28 +9,29 @@ SvelteKit 5 UI providing the chat interface, session history, provider configura
 # Local Contracts
 
 - Connection: Calls gateway API via Remult client at `http://localhost:3001/api`.
-- Theme & Styling: Soothing AI Slate & Neon Teal dark theme using Tailwind CSS v4, derived from OKLCH base colors: text oklch(0.97 0.005 260.0), background oklch(0.08 0.005 260.0), primary oklch(0.74 0.13 185.0), secondary oklch(0.60 0.12 260.0).
+- Auth: better-auth (email/password) via `$lib/auth-client.ts` — wraps `better-auth/svelte`.
+- Login: `/login` — sign-in/sign-up form using `authClient.signIn.email()` / `authClient.signUp.email()`.
+- Session: `authClient.useSession()` returns nanostores Atom; subscribe to get reactive user data.
+- Colors: text oklch(0.97 0.005 260.0), background oklch(0.12 0.02 260.0), primary oklch(0.74 0.13 185.0), secondary oklch(0.60 0.12 260.0).
 - Framework Mode: Svelte 5 Runes mode only. No legacy Svelte 4 APIs.
 - Loaders: Use a consistent, clean CSS/SVG spinning circle loader for component loading states instead of pulsing skeletons.
 
 # Work Guidance
 
-- **Components**: Group custom widgets under `src/lib/components/` (e.g. `chat/`, `sidebar/`). Use `src/lib/components/ui/` for shadcn-svelte primitives.
-- **Page Shape**: Keep route pages thin. Extract large page sections into focused components under `src/lib/components/`; pages should orchestrate loading, live sync, navigation, and callbacks.
-- **Runes**: Always use `$state`, `$derived`, `$effect`, and `$props` for state management and props.
-- **Stores**: Use Svelte 5 runes-based files under `src/lib/stores/` for client-side state.
-- **Remult live sync**: Use the universal `createLiveQuery` rune for real-time entity synchronization. Avoid writing manual `$effect(() => { return repo.liveQuery().subscribe(...) })` boilerplate inside pages/components.
+- **Components**: `src/lib/components/` `src/lib/components/ui/`
+- **Page Shape**: Routes thin. Sections in `src/lib/components/`; orchestrate loading, live sync, navigation, callbacks.
+- **Runes**: use `$state`, `$derived`, `$effect`, and `$props` for state management and props.
+- **Stores**: Use Svelte 5 runes-based files under `src/lib/stores/` client-side state.
+- **Remult live sync**: `createLiveQuery` rune for real-time entity synchronization. Avoid manual `$effect` subscriptions.
+- **Auth client**: Import `authClient` from `$lib/auth-client.js`. Available methods: `signIn`, `signUp`, `signOut`, `useSession`.
+- **Route guard**: Root `+layout.svelte` checks session and redirects to `/login` for protected routes.
+- **Session visibility**: `SidebarSessionList` shows lock/globe icon. Click calls `AgentService.toggleSessionVisibility`.
 - **Clean Code**: Prefer readable, maintainable code over dense one-file logic or clever type gymnastics. Avoid unnecessary `any`, oversized props, and duplicated UI blocks.
-- **Framework Abstraction**: If a pattern requires repeating manual subscriptions, lifecycle effects, or state-handling boilerplate (e.g., localStorage caching, Remult liveQuery subscriptions), extract them into a Svelte 5 custom rune/hook rather than copy-pasting across files.
-- **Path Aliases**: Use `$lib` for `src/lib/` and `@stratum/shared` for the shared library package.
-- **Icons & Typography**: Use Remixicon Svelte + Hugeicons, and Outfit Variable font.
-- **Utility**: Use the `cn()` function from `$lib/utils.ts` for styling classes combining.
 
 # Verification
 
-- Run type checking and UI sync: `bun run check` (runs svelte-kit sync and svelte-check) inside the `apps/frontend` directory.
-- Run formatter: `bun run format` (runs Prettier).
+- Run `bun run check` in the `apps/frontend` directory.
 
 # Child DOX Index
 
-_No child DOX indexes for this application._
+(none)

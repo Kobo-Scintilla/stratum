@@ -205,7 +205,8 @@ export class AgentService {
     const isFirstMessage =
       (await remult.repo(ChatMessage).count({ sessionId })) === 0;
 
-    await insertUserMessage(sessionId, prompt);
+    const userId = remult.user?.id || "";
+    await insertUserMessage(sessionId, userId, prompt);
 
     if (isFirstMessage) {
       // Asynchronously generate title summary using Title Summary Model or session model in the background
@@ -237,6 +238,7 @@ export class AgentService {
             if (!sessionSettings) {
               sessionSettings = await remult.repo(ChatSessionSettings).insert({
                 id: sessionId,
+                ownerId: userId,
                 modelProvider: config.modelProvider,
                 modelId: config.modelId,
                 contextWindow: 0,
@@ -416,9 +418,10 @@ export class AgentService {
 
   @BackendMethod({ allowed: true, transactional: false })
   static async listSessions() {
+    const userId = remult.user?.id || "";
     const sql = SqlDatabase.getDb();
     const result = await sql.execute(`
-			SELECT m.sessionId, m.content, m.createdAt, s.title, s.pinned,
+			SELECT m.sessionId, m.content, m.createdAt, s.title, s.pinned, s.visibility, s.ownerId,
 				(SELECT COUNT(*) FROM chatMessages m3 WHERE m3.sessionId = m.sessionId) as messageCount
 			FROM chatMessages m
 			LEFT JOIN chatSessionSettings s ON s.id = m.sessionId
@@ -427,6 +430,7 @@ export class AgentService {
 				FROM chatMessages m2
 				WHERE m2.sessionId = m.sessionId
 			)
+			AND (s.ownerId = '${userId.replace(/'/g, "''")}' OR s.visibility = 'shared' OR s.ownerId IS NULL OR s.ownerId = '')
 			ORDER BY COALESCE(s.pinned, 0) DESC, m.createdAt DESC
 		`);
     const rows = result.rows as Array<Record<string, unknown>>;
@@ -436,6 +440,8 @@ export class AgentService {
       lastMessage: String(r.content ?? "").slice(0, 120),
       title: r.title ? String(r.title) : undefined,
       pinned: !!r.pinned,
+      visibility: (r.visibility as string) || "private",
+      ownerId: (r.ownerId as string) || "",
       messageCount: Number(r.messageCount ?? 0),
     }));
   }
@@ -536,6 +542,23 @@ export class AgentService {
     }
     AgentService.cachedFeatures = { codeInstalled, mlInstalled };
     return AgentService.cachedFeatures;
+  }
+
+  @BackendMethod({ allowed: true, transactional: false })
+  static async toggleSessionVisibility(sessionId: string): Promise<"private" | "shared"> {
+    const userId = remult.user?.id || "";
+    let settings = await remult.repo(ChatSessionSettings).findId(sessionId);
+    if (!settings) {
+      throw new Error("Session not found");
+    }
+    // Only owner can toggle visibility
+    if (settings.ownerId && settings.ownerId !== userId) {
+      throw new Error("Only the session owner can change visibility");
+    }
+    const newVis = settings.visibility === "shared" ? "private" : "shared";
+    settings.visibility = newVis;
+    await remult.repo(ChatSessionSettings).save(settings);
+    return newVis;
   }
 
   @BackendMethod({ allowed: true, transactional: true })

@@ -1,4 +1,4 @@
-export function load({ cookies }: { cookies: import('@sveltejs/kit').RequestEvent['cookies'] }) {
+export function load({ cookies, locals }: { cookies: import('@sveltejs/kit').Cookies; locals: App.Locals }) {
 	const raw = cookies.get('nav-active-tab');
 	let activeTab: string | null = null;
 	if (raw) {
@@ -8,5 +8,5 @@ export function load({ cookies }: { cookies: import('@sveltejs/kit').RequestEven
 			/* corrupt cookie */
 		}
 	}
-	return { activeTab };
+	return { activeTab, user: locals.user ?? null };
 }

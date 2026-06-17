@@ -4,15 +4,15 @@
 declare global {
 	namespace App {
 		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
+		interface Locals {
+			user: { id: string; name: string; email: string } | null
+		}
+		interface PageData {
+			user: { id: string; name: string; email: string } | null
+		}
 		// interface PageState {}
 		// interface Platform {}
 	}
-
-	var remultApi:
-		| { withRemult(event: undefined, what: () => Promise<void>): Promise<void> }
-		| undefined;
 }
 
 export {};

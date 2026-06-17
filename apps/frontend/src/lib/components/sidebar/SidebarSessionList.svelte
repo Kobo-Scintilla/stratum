@@ -16,6 +16,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { createLiveQuery } from '$lib/stores/live-query.svelte.js';
 	import { browser } from '$app/environment';
+import { optimistic } from '$lib/optimistic.svelte.js';
 
 	interface Session {
 		sessionId: string;
@@ -104,7 +105,14 @@
 	}
 
 	async function togglePin(id: string) {
-		await remult.call(AgentService.togglePinSession, undefined, id);
+		const session = dashboard.sessions.find(s => s.sessionId === id);
+		if (!session) return;
+		const prevPinned = session.pinned;
+		session.pinned = !prevPinned;
+		await optimistic(
+			() => remult.call(AgentService.togglePinSession, undefined, id),
+			() => { session.pinned = prevPinned; }
+		);
 		dashboard.refreshSessions();
 	}
 
@@ -117,6 +125,8 @@
 				preview: s.lastMessage,
 				title: live?.title || s.title || s.lastMessage,
 				pinned: live?.pinned ?? s.pinned ?? false,
+				visibility: s.visibility || 'private',
+				ownerId: s.ownerId || '',
 				createdAt,
 				messageCount: s.messageCount,
 				time: timeAgo(createdAt, Date.now())
@@ -215,6 +225,26 @@
 												<path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
 											</svg>
 										{/if}
+									<button
+										onclick={async (e) => {
+											e.stopPropagation();
+											const prevVis = item.visibility;
+											item.visibility = item.visibility === 'shared' ? 'private' : 'shared';
+											await optimistic(
+												() => remult.call(AgentService.toggleSessionVisibility, undefined, item.sessionId),
+												() => { item.visibility = prevVis; }
+											);
+											dashboard.refreshSessions();
+										}}
+										class="ml-1 flex size-4 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground"
+										title={item.visibility === 'shared' ? 'Shared - click to make private' : 'Private - click to share'}
+									>
+										{#if item.visibility === 'shared'}
+											<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+										{:else}
+											<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+										{/if}
+									</button>
 
 										{#if renamingSessionId === item.sessionId}
 											<input

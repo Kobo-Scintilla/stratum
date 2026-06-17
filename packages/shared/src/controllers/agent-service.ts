@@ -23,6 +23,8 @@ export class AgentService {
       lastMessage: string;
       title?: string;
       pinned?: boolean;
+      visibility: string;
+      ownerId: string;
       createdAt: Date | string;
       messageCount: number;
     }>
@@ -118,6 +120,11 @@ export class AgentService {
     mlInstalled: boolean;
   }> {
     return clientOnly("checkHeadroomFeatures");
+  }
+
+  @BackendMethod({ allowed: true, transactional: false })
+  static async toggleSessionVisibility(sessionId: string): Promise<string> {
+    return clientOnly("toggleSessionVisibility");
   }
 
   @BackendMethod({ allowed: true, transactional: true })

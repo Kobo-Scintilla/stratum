@@ -7,7 +7,7 @@
 	import SidebarProvidersList from './SidebarProvidersList.svelte';
 	import SidebarSettingsPanel from './SidebarSettingsPanel.svelte';
 
-	let { ref = $bindable(null), ...restProps }: ComponentProps<typeof Sidebar.Root> = $props();
+	let { ref = $bindable(null), sessionData = null, ...restProps }: ComponentProps<typeof Sidebar.Root> & { sessionData?: any } = $props();
 	const dashboard = useDashboardState();
 </script>
 
@@ -18,7 +18,7 @@
 	class="glass-sidebar overflow-hidden *:data-[sidebar=sidebar]:flex-row max-md:hidden"
 	{...restProps}
 >
-	<SidebarNav />
+	<SidebarNav sessionData={sessionData} />
 
 	<Sidebar.Root collapsible="none" class="[position:relative] flex flex-1 overflow-hidden md:flex">
 		<!-- Mobile: show only active panel in-flow (no absolute positioning) -->

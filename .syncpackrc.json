@@ -1,0 +1,9 @@
+{
+  "versionGroups": [
+    {
+      "packages": ["**"],
+      "dependencies": ["@biomejs/biome", "typescript", "turbo", "remult", "svelte", "better-auth", "runed", "@nerdfolio/remult-better-auth", "kysely"],
+      "pinVersion": ""
+    }
+  ]
+}

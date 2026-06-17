@@ -1,30 +1,40 @@
 # Purpose
 
-Defines shared data structures, database entities, and TypeScript types used by both the frontend and gateway.
+Shared Remult entity definitions and types used by both gateway and frontend.
 
 # Ownership
 
-- Monorepo Core / Shared Package Maintainer
+- Shared Package Team / Shared Package Agent
 
 # Local Contracts
 
-- All entities must be compatible with Remult decorator-based ORM.
-- Entities are compiled and exported via `package.json` for consumption by `apps/frontend` and `apps/gateway`.
-- Exports entities: `ChatMessage`, `ActiveStream`, `ProviderSetting`, `ChatSessionSettings`, `AppSettings`.
+- Entities use Remult decorators (`@Entity`, `@Fields`, etc.).
+- All entities use `allowApiCrud: true` — API-level auth is enforced by gateway Remult config.
+- Controllers mirror gateway BackendMethods with `clientOnly()` stubs for frontend type safety.
+
+## Entities
+
+| Entity | Table | Key Fields |
+|--------|-------|------------|
+| `ChatMessage` | `chatMessages` | sessionId, ownerId, role, content, sortOrder, usage/cost fields, checkpointHash |
+| `ChatSessionSettings` | `chatSessionSettings` | id (sessionId), ownerId, visibility (private\|shared), model config, title, pinned |
+| `ActiveStream` | `activeStreams` | sessionId, prompt, text, isGenerating, segments, toolCalls |
+| `ProviderSetting` | `providerSettings` | id, apiKey (encrypted), enabled, baseUrl, apiType, models |
+| `AppSettings` | `appSettings` | id (always '_defaults'), default model config, title summary model |
+| `BuddyMessage` | `buddyMessages` | fromUserId, toUserId, content, createdAt, read |
+
+## Controllers
+
+| Controller | Key Methods |
+|------------|-------------|
+| `AgentService` | ask, listSessions, deleteSession, renameSession, togglePinSession, toggleSessionVisibility, provider management, headroom features |
 
 # Work Guidance
 
-- Add/modify fields or validation rules in `src/entities/`.
-- Declare shared TypeScript interfaces in `src/types.ts`.
-- Keep entity schemas synchronized with DB migrations/alterations in `apps/gateway/src/api.ts`.
-- Add/modify entity fields to extend shared data models. Ensure fields are properly exported in `src/index.ts`.
-- Add `title` and `pinned` to `ChatSessionSettings` to persist session names and pinning status.
-- Ensure all symbols are exported in `src/index.ts`.
-
-# Verification
-
-- Build shared package and monorepo: `bun run build`.
+- Add new entities to `src/entities/` and re-export from `src/index.ts`.
+- Add new BackendMethod stubs to `src/controllers/agent-service.ts`.
+- After modifying entities, run `bunx tsc --noEmit` in gateway and `bun run check` in frontend.
 
 # Child DOX Index
 
-_No child DOX indexes for this package._
+(none)

@@ -8,6 +8,12 @@ export class ChatSessionSettings {
   id!: string; // sessionId
 
   @Fields.string()
+  ownerId = "";
+
+  @Fields.string()
+  visibility: "private" | "shared" = "private";
+
+  @Fields.string()
   modelProvider = "opencode-go";
 
   @Fields.string()

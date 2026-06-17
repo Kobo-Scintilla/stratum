@@ -1,26 +1,27 @@
 {
-  "name": "@stratum/gateway",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
-    "check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@earendil-works/pi-ai": "^0.78.1",
-    "@earendil-works/pi-coding-agent": "^0.79.1",
-    "@hono/node-server": "^1.14.0",
-    "@stratum/shared": "workspace:*",
-    "headroom-ai": "^0.22.4",
-    "hono": "^4.7.0",
-    "pi-hashline-readmap": "^0.9.1",
-    "remult": "^3.3.12"
-  },
-  "devDependencies": {
-    "@types/node": "^25.9.1",
-    "bun-types": "^1.1.0",
-    "typescript": "^6.0.2"
-  }
+    "name": "@stratum/gateway",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch src/index.ts",
+        "check": "bunx tsc --noEmit",
+        "check:watch": "bunx tsc --noEmit --watch",
+        "check:lint": "cd ../.. && biome check apps/gateway/src 2>&1 || true"
+    },
+    "dependencies": {
+        "@earendil-works/pi-ai": "^0.78.1",
+        "@earendil-works/pi-coding-agent": "^0.79.1",
+        "@hono/node-server": "^1.14.0",
+        "@stratum/shared": "workspace:*",
+        "headroom-ai": "^0.22.4",
+        "hono": "^4.7.0",
+        "pi-hashline-readmap": "^0.9.1",
+        "remult": "^3.3.12"
+    },
+    "devDependencies": {
+        "@types/node": "^25.9.1",
+        "bun-types": "^1.1.0",
+        "typescript": "^6.0.2"
+    }
 }
